@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             'servo_controller = robot_arm_pkg.servo_controller:main'
+            'img_processor_node = robot_package.img_processor_node:main'
         ],
     },
 )
