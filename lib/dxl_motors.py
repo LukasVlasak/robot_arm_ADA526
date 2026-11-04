@@ -137,6 +137,23 @@ class DXLMotors:
         # 4. ČIŠTĚNÍ PO ODESLÁNÍ (Doporučená praxe pro vyčištění paměti)
         self.goalPositionWriter.clearParam()
 
+    def setMotorsSpeed(self, speed):
+        """
+            42 - 45 mega pomaly
+            46-52 ty MAGOREEEEEE
+        """
+        self.profileVelocityWriter.clearParam()
+        
+        param_velocity_43 = utils.to4bytes(speed)[0]
+
+        for dxl_id in self.dxl_ids:
+            self.profileVelocityWriter.addParam(dxl_id, param_velocity_43)
+
+        dxl_comm_result = self.profileVelocityWriter.txPacket()
+        self.__checkRWResult(dxl_comm_result)
+
+        self.profileVelocityWriter.clearParam()
+
     def setSingleMotorGoalPos(self, pos, id):
         self.__checkID(id)
         
