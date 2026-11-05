@@ -24,10 +24,6 @@ class PrecisionNode(Node):
         self.get_logger().info('Action server started')
 
     def goal_callback(self, goal_request):
-        if goal_request.x < 0 or goal_request.y < 0 or goal_request.z < 0
-            self.get_logger().warn('Invalid coordinate')
-            return GoalResponse.REJECT
-            
         return GoalResponse.ACCEPT
 
     def cancel_callback(self, goal_handle):
