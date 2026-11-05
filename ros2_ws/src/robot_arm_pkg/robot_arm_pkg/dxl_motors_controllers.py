@@ -76,37 +76,7 @@ class DXLMotorsController(Node):
             except ValueError as e:
                 self.get_logger().error(f'Error at DXL occured: {e}')
                 
-
-    # def deg2raw(self, deg, home, min_pos, max_pos):
-    #     """Převede úhel ve stupních (-180 až +180) na raw hodnotu serva."""
-    #     # Omezení vstupu na povolený rozsah
-    #     deg = max(-180.0, min(180.0, float(deg)))
-
-    #     if deg < 0:
-    #         # Dráha do záporu (-180° -> MIN, 0° -> HOME)
-    #         scale = (home - min_pos) / 180.0
-    #         raw = home + (deg * scale)
-    #     else:
-    #         # Dráha do kladu (0° -> HOME, +180° -> MAX)
-    #         scale = (max_pos - home) / 180.0
-    #         raw = home + (deg * scale)
-
-    #     return int(round(raw))
-
-
-    # def raw2deg(self, raw, home, min_pos, max_pos):
-    #     """Převede raw hodnotu ze serva na úhel ve stupních (-180 až +180)."""
-    #     # Omezení vstupu na povolené hardwarové limity
-    #     raw = max(min_pos, min(max_pos, int(raw)))
-
-    #     if raw < home:
-    #         # Záporný úhel
-    #         deg = (raw - home) / ((home - min_pos) / 180.0)
-    #     else:
-    #         # Kladný úhel
-    #         deg = (raw - home) / ((max_pos - home) / 180.0)
-
-    #     return round(deg, 2)
+                 
         
 def main():
     rclpy.init()
