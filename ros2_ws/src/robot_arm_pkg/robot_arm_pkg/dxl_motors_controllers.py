@@ -49,7 +49,7 @@ ROBOT_QR = [0, 60*pi/180, -100*pi/180, 40*pi/180, 0]
 
 ACTIVE_MOTORS = [1, 2, 3, 4, 5]
 
-TESTING_MOTORS_SPEED = 25
+TESTING_MOTORS_SPEED = 250
 
 GEAR = np.array([1, 4, 3, 1, 1]) # kdyz nebude fungovat tak toto upravit 
 
