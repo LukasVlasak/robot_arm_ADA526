@@ -1,21 +1,18 @@
 import threading
 
-import rclpy from rclpy.node import Node
+import rclpy 
+from rclpy.node import Node
 from rclpy.action import ActionClient
 from robot_interfaces.action import Precision
 
 from robot_interfaces.msg import MotorCommand
 
 class OperatorNode(Node):
-    def __init__(self):
-	    super().__init__('operator_node')
+	def __init__(self):
+		super().__init__('operator_node')
 
 	    # Publisher
-	    self.motor_publisher = self.create_publisher(
-		MotorCommand,
-		'/motor_controller/command',
-		10
-	    )
+		self.motor_publisher = self.create_publisher(MotorCommand, '/motor_controller/command', 10)
 
 		self.get_logger().info('Operator node initialized')
 
@@ -42,39 +39,38 @@ class OperatorNode(Node):
 		print('==========================\n')
 
 		while rclpy.ok():
+			try:
+				user_input = input('Robot > ').strip().lower()
 
-		    try:
-		        user_input = input('Robot > ').strip().lower()
+				if not user_input:
+					continue
 
-		        if not user_input:
-		            continue
+				args = user_input.split()
 
-		        args = user_input.split()
+				command = args[0]
 
-		        command = args[0]
+				if command == 'home':
+					self.publish_preset('home')
 
-		        if command == 'home':
-		            self.publish_preset('home')
-
-		        elif command == 'weight':
-		            self.publish_preset('weight')
+				elif command == 'weight':
+					self.publish_preset('weight')
 
 
-		        elif command == 'move':
-		            self.handle_move(args)
+				elif command == 'move':
+					self.handle_move(args)
 
-		        elif command == 'exit':
-		            rclpy.shutdown()
-		            break
+				elif command == 'exit':
+					rclpy.shutdown()
+					break
 
-		        else:
-		            print('Unknown command!')
+				else:
+					print('Unknown command!')
 
-		    except ValueError:
-		        print('Invalid input!')
+			except ValueError:
+				print('Invalid input!')
 
-		    except EOFError:
-		        break
+			except EOFError:
+				break
 
 # ==========================================
 # PUBLISH PREDEFINED COMMANDS
@@ -99,8 +95,8 @@ class OperatorNode(Node):
 	def handle_move(self, args):
 
 		if len(args) != 4:
-		    print('Usage: move x y z')
-		    return
+			print('Usage: move x y z')
+			return
 
 		x, y, z = map(float, args[1:])
 
@@ -132,7 +128,7 @@ def main(args=None):
 
 	finally:
 		if rclpy.ok():
-		    rclpy.shutdown()
+			rclpy.shutdown()
 
 		node.destroy_node()
 

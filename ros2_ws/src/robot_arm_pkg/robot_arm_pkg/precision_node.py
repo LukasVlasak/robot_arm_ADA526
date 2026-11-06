@@ -4,7 +4,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionServer, GoalResponse, CancelResponse
 
-from robot_interfaces.action import Precison.action
+from robot_interfaces.action import Precison
 
 
 class PrecisionNode(Node):
@@ -38,7 +38,7 @@ class PrecisionNode(Node):
         z = goal_handle.request.z
         
         try:
-        
+            return
         except:
             goal_handle.abort()
 
