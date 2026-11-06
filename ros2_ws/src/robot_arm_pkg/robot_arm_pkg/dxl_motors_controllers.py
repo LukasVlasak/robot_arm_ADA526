@@ -7,7 +7,7 @@ from spatialmath import SE3
 import numpy as np
 from utils import rad2steps, steps2rad
 
-from std_msgs.msg import String
+from std_msgs.msg import String, Empty
 
 
 HOME_POS_MOTORS = {
@@ -69,6 +69,8 @@ class DXLMotorsController(Node):
         
         self.arrowTestingSub = self.create_subscription(String, 'arrow_user_input', self.arrow_movement, 10)
         self.setMotorSpeedSub = self.create_subscription(String, 'set_speed', self.__set_speed_callback, 10)
+        self.disableMotorTorque = self.create_subscription(Empty, 'disable_torque', self.__disable_torque_callback, 10)
+
 
     def arrow_movement(self, msg):
         direction, dxl_id = msg.data.split()
@@ -155,6 +157,10 @@ class DXLMotorsController(Node):
     def __set_speed_callback(self, msg):
         dxl_id, speed = (int(v) for v in msg.data.split())
         self.setMotorSpeed(dxl_id, speed)
+
+    # pro cli disable_torque
+    def __disable_torque_callback(self, msg):
+        self.dxlMotors.setDXLTorqueEnabled(False)
 
     def setMotorSpeed(self, dxl_id, speed):
         self.dxlMotors.setSingleMotorSpeed(dxl_id, speed)

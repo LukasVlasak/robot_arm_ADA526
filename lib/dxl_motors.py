@@ -79,7 +79,13 @@ class DXLMotors:
     def setDXLTorqueEnabled(self, enable):
         for id in self.dxl_ids:
             dxl_comm_result, dxl_error = self.packetHandler.write1ByteTxRx(self.portHandler, id, self.addr_torque_enable, 1 if enable == True else 0)
-            self.__checkRWResult(dxl_comm_result, dxl_error, "Motor " + str(id) + ": Torque enabled")
+            success_msg = ""
+            if enable == True:
+                success_msg = "Motor " + str(id) + ": Torque enabled"
+            else:
+                success_msg = "Motor " + str(id) + ": Torque disabled"
+
+            self.__checkRWResult(dxl_comm_result, dxl_error, success_msg)
 
 
 
