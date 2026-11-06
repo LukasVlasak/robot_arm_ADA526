@@ -20,10 +20,10 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'img_processor_node = robot_arm.img_processor_node:main',
-            'arrow_movement_testing_pub = robot_arm.arrow_movement_testing_pub:main',
-            'dxl_motors_controllers = robot_arm.dxl_motors_controllers:main',
-            'operator = robot_package.operator_node:main'
+            'img_processor_node = robot_arm_pkg.img_processor_node:main',
+            'arrow_movement_testing_pub = robot_arm_pkg.arrow_movement_testing_pub:main',
+            'dxl_motors_controllers = robot_arm_pkg.dxl_motors_controllers:main',
+            'operator = robot_arm_pkg.operator_node:main'
         ],
     },
 )
