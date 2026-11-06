@@ -23,7 +23,11 @@ setup(
             'img_processor_node = robot_arm_pkg.img_processor_node:main',
             'arrow_movement_testing_pub = robot_arm_pkg.arrow_movement_testing_pub:main',
             'dxl_motors_controllers = robot_arm_pkg.dxl_motors_controllers:main',
-            'operator = robot_arm_pkg.operator_node:main'
+            'operator = robot_arm_pkg.operator_node:main',
+
+
+            # jednorazove console skripty
+            'set_speed = robot_arm_pkg.set_motor_speed_pub:main'
         ],
     },
 )

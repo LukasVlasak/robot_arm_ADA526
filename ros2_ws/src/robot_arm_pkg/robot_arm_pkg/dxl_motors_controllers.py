@@ -68,6 +68,7 @@ class DXLMotorsController(Node):
         self.arrow_counter = 0
         
         self.arrowTestingSub = self.create_subscription(String, 'arrow_user_input', self.arrow_movement, 10)
+        self.setMotorSpeedSub = self.create_subscription(String, 'set_speed', self.__set_speed_callback, 10)
 
     def arrow_movement(self, msg):
         direction, dxl_id = msg.data.split()
@@ -149,6 +150,15 @@ class DXLMotorsController(Node):
 
     def goToPos(): # hlidat max min motoru
         return
+
+    # pro cli set_speed
+    def __set_speed_callback(self, msg):
+        dxl_id, speed = (int(v) for v in msg.data.split())
+        self.setMotorSpeed(dxl_id, speed)
+
+    def setMotorSpeed(self, dxl_id, speed):
+        self.dxlMotors.setSingleMotorSpeed(dxl_id, speed)
+        self.get_logger().info(f'Speed {speed} was set to motor {dxl_id}')
 
     # kroky motoru na uhel v kloubu v DH modelu
     def __stepsToQ(self, i, steps):
