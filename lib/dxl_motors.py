@@ -18,6 +18,7 @@ class DXLMotors:
         self.addr_is_moving              = 122
         self.protocol_version            = 2.0
         self.addr_operating_mode         = 11
+        self.extended_position_val       = 4
         self.addr_profile_velocity       = 112  
         self.len_profile_velocity        = 4
         self.port                        = port  # <-- you may need to change the port where the u2d2 is connected
@@ -38,10 +39,12 @@ class DXLMotors:
         self.presentPositionReader = dxl.GroupSyncRead(self.portHandler, self.packetHandler, self.addr_present_position, self.len_present_position)
         self.goalPositionWriter = dxl.GroupSyncWrite(self.portHandler, self.packetHandler, self.addr_goal_position, self.len_goal_position)
         self.profileVelocityWriter = dxl.GroupSyncWrite(self.portHandler, self.packetHandler, self.addr_profile_velocity, self.len_profile_velocity)
+        self.operatingModeWriter = dxl.GroupSyncWrite(self.portHandler, self.packetHandler, self.addr_operating_mode, 1)
 
         # initial settings
+        self.__setExtendedOperatingMode()
         self.setDXLTorqueEnabled(True)
-        self.slowAllMotors()
+        self.setMotorsSpeed(45)
 
     def __open_port(self):
         if self.portHandler.openPort():
@@ -57,24 +60,28 @@ class DXLMotors:
             print("Failed to change the baudrate")
             quit()
 
+    # kvuli tem limitam a DH modelu ...
+    def __setExtendedOperatingMode(self):
+        self.operatingModeWriter.clearParam()
+
+        for id in self.dxl_ids:
+            self.operatingModeWriter.addParam(id, [self.extended_position_val])
+
+        dxl_comm_result = self.operatingModeWriter.txPacket()
+        self.__checkRWResult(dxl_comm_result)
+
+        # 4. ČIŠTĚNÍ PO ODESLÁNÍ (Doporučená praxe pro vyčištění paměti)
+        self.operatingModeWriter.clearParam()
+
+    def __toSigned32(self, v):
+        return v - (1 << 32) if v >= (1 << 31) else v
+
     def setDXLTorqueEnabled(self, enable):
         for id in self.dxl_ids:
             dxl_comm_result, dxl_error = self.packetHandler.write1ByteTxRx(self.portHandler, id, self.addr_torque_enable, 1 if enable == True else 0)
             self.__checkRWResult(dxl_comm_result, dxl_error, "Motor " + str(id) + ": Torque enabled")
 
 
-    def slowAllMotors(self):
-        self.profileVelocityWriter.clearParam()
-
-        param_velocity_43 = utils.to4bytes(43)[0] # HARD CODED -> observe when testing
-
-        for dxl_id in self.dxl_ids:
-            self.profileVelocityWriter.addParam(dxl_id, param_velocity_43)
-
-        dxl_comm_result = self.profileVelocityWriter.txPacket()
-        self.__checkRWResult(dxl_comm_result)
-
-        self.profileVelocityWriter.clearParam()
 
     def getIsMoving(self, id):
         self.__checkID(id)
@@ -90,7 +97,7 @@ class DXLMotors:
         position, dxl_comm_result, dxl_error = self.packetHandler.read4ByteTxRx(self.portHandler, id, self.addr_present_position)
         self.__checkRWResult(dxl_comm_result, dxl_error)
 
-        return position
+        return self.__toSigned32(position)
     
     def getMotorsPos(self, ids=None):
         result = []
@@ -111,7 +118,7 @@ class DXLMotors:
                 raise RuntimeError("Data for group reading not available")
 
             pos = self.presentPositionReader.getData(id, self.addr_present_position, self.len_present_position)
-            result.append(pos)
+            result.append(self.__toSigned32(pos))
 
         return result
 
@@ -153,6 +160,16 @@ class DXLMotors:
         self.__checkRWResult(dxl_comm_result)
 
         self.profileVelocityWriter.clearParam()
+
+    def setSingleMotorSpeed(self, id, speed):
+        """
+            42 - 45 mega pomaly
+            46-52 ty MAGOREEEEEE
+        """
+        self.__checkID(id)
+        
+        dxl_comm_result, dxl_error = self.packetHandler.write4ByteTxRx(self.portHandler, id, self.addr_profile_velocity, int(speed))
+        self.__checkRWResult(dxl_comm_result, dxl_error)
 
     def setSingleMotorGoalPos(self, pos, id):
         self.__checkID(id)
