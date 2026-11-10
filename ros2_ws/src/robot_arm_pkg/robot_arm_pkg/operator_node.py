@@ -133,4 +133,4 @@ def main(args=None):
 		node.destroy_node()
 
 
-if name == 'main': main()
+if __name__ == 'main': main()

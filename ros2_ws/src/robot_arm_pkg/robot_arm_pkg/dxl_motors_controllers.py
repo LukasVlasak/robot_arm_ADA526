@@ -8,6 +8,7 @@ import numpy as np
 from utils import rad2steps, steps2rad
 
 from std_msgs.msg import String, Empty
+from robot_interfaces.msg import MotorCommand
 
 
 HOME_POS_MOTORS = {
@@ -39,8 +40,11 @@ JOINT4_LIM = [ -2*pi/180, 170*pi/180] # odecetl jsem 5 stupnu v zapornych i v kl
 JOINT5_LIM = [-180*pi/180, 180*pi/180]
 
 # jsem dat primo namerenou hodnotu curr pos motoru kdyz bude sedet s DH modelem
-DH_OFFSETS = [2113, 4989, 1370, 3364, 14]
-DIRECTIONS = [1, -1, 1, -1, 1]
+DH_OFFSETS = [2105, 844, 5578, 3377, 13]
+DIRECTIONS = [1, -1, -1, -1, 1]
+
+# [2105, -1260, 9112, 2725, 13]
+
 
 # zakladna je taky volna - da se otocit i s torqem zapnutym
 # zda se mi to nejaky prohnuty
@@ -67,9 +71,10 @@ class DXLMotorsController(Node):
         self.current_q = np.array(self.robot.qr, dtype=float)
         self.arrow_counter = 0
         
-        self.arrowTestingSub = self.create_subscription(String, 'arrow_user_input', self.arrow_movement, 10)
-        self.setMotorSpeedSub = self.create_subscription(String, 'set_speed', self.__set_speed_callback, 10)
-        self.disableMotorTorque = self.create_subscription(Empty, 'disable_torque', self.__disable_torque_callback, 10)
+        self.create_subscription(String, 'arrow_user_input', self.arrow_movement, 10)
+        self.create_subscription(String, 'set_speed', self.__set_speed_callback, 10)
+        self.create_subscription(Empty, 'disable_torque', self.__disable_torque_callback, 10)
+        self.create_subscription(MotorCommand, '/motor_controller/command', self.__motor_cmd_callback, 10)
 
 
     def arrow_movement(self, msg):
@@ -131,6 +136,7 @@ class DXLMotorsController(Node):
         if not sol.success:
             sol = self.robot.ikine_LM(T, q0=sol.q,
                                     mask=[1, 1, 1, 0, 0, 0], joint_limits=True)
+
         if not sol.success:
             raise ValueError(f"Bod ({x}, {y}, {z}) je mimo dosah robota")
 
@@ -150,9 +156,23 @@ class DXLMotorsController(Node):
         self.current_q = q
         return steps
 
-    def goToPos(): # hlidat max min motoru
-        return
+    def goToPos(self, x, y, z): # hlidat max min motoru
+        print(x, y, z)
+        steps = self.coordsToSteps(x, y, z)
 
+        # check the limits
+        for i, step in enumerate(steps):
+            if not self.__check_motor_limits(i, self.__stepsToQ(i, step)):
+                return
+
+        self.dxlMotors.setMotorsGoalPos(steps)
+        self.get_logger().info(f'Moving motors to motor position: {steps}')
+
+    def __motor_cmd_callback(self, msg):
+        if msg.command == 'move':
+            self.goToPos(msg.x, msg.y, msg.z)
+
+# x 400 y 0 z 0
     # pro cli set_speed
     def __set_speed_callback(self, msg):
         dxl_id, speed = (int(v) for v in msg.data.split())
