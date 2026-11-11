@@ -34,7 +34,7 @@ class OperatorNode(Node):
 		print('Available commands:')
 		print('  home')
 		print('  weight')
-		print('  move x y z')
+		print('  move K 10 z')
 		print('  exit')
 		print('==========================\n')
 
@@ -67,7 +67,7 @@ class OperatorNode(Node):
 					print('Unknown command!')
 
 			except ValueError:
-				print('Invalid input!')
+				print('Invalid input')
 
 			except EOFError:
 				break
@@ -95,10 +95,14 @@ class OperatorNode(Node):
 	def handle_move(self, args):
 
 		if len(args) != 4:
-			print('Usage: move x y z')
+			print('Usage: move C 12 0.1')
 			return
 
-		x, y, z = map(float, args[1:])
+		letter = args[1]
+		number = int(args[2])
+		z = float(args[3])
+
+		x, y = self.__convert_coordinates(letter, number)
 
 		msg = MotorCommand()
 
@@ -113,6 +117,17 @@ class OperatorNode(Node):
 		    f'Published position: x={x}, y={y}, z={z}'
 		)
 
+	def __convert_coordinates(self, letter, number):
+		#0.025
+		number = int(number)
+		x = 600 - (number - 1) * 25
+		x = float(x / 1000)
+
+		ascii_code = int(ord(letter))
+		y = 250 + (ascii_code - 117) * 25
+		y = float(y / 1000)
+
+		return x, y
 
 def main(args=None):
 
