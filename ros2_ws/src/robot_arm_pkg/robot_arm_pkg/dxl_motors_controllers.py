@@ -29,27 +29,23 @@ WEIGHT_POS_MOTORS = {
 LINK1 = 0.220
 LINK2 = 0.300
 LINK3 = 0.280
-LINK4 = 0.201
+LINK4 = 0.203
 LINK4_OFFSET = -0.00262
-LINK5_OFFSET = 0.044
+LINK5_OFFSET = 0.043
 
 JOINT1_LIM = [-90*pi/180, 90*pi/180]
-JOINT2_LIM = [ -25*pi/180, 115*pi/180] # odecetl jsem 5 stupnu v zapornych i v kladnych kvuli testovani
-JOINT3_LIM = [-135*pi/180, 135*pi/180] # odecetl jsem 5 stupnu v zapornych i v kladnych kvuli testovani
-JOINT4_LIM = [ -2*pi/180, 170*pi/180] # odecetl jsem 5 stupnu v zapornych i v kladnych kvuli testovani
+JOINT2_LIM = [ -70*pi/180, 70*pi/180] # odecetl jsem 5 stupnu v zapornych i v kladnych kvuli testovani
+JOINT3_LIM = [-90*pi/180, 180*pi/180] # odecetl jsem 5 stupnu v zapornych i v kladnych kvuli testovani
+JOINT4_LIM = [ -92*pi/180, 85*pi/180] # odecetl jsem 5 stupnu v zapornych i v kladnych kvuli testovani
 JOINT5_LIM = [-180*pi/180, 180*pi/180]
 
 # jsem dat primo namerenou hodnotu curr pos motoru kdyz bude sedet s DH modelem
-DH_OFFSETS = [2105, 844, 5578, 3377, 13]
+DH_OFFSETS = [2114, 2002, 4093, 2351, 5]
 DIRECTIONS = [1, -1, -1, -1, 1]
 
-# [2105, -1260, 9112, 2725, 13]
+R_FLIP = 0.2 # kdy pero natocito 180 jako vychozi hodnota solveru
 
-
-# zakladna je taky volna - da se otocit i s torqem zapnutym
-# zda se mi to nejaky prohnuty
-
-ROBOT_QR = [0, 60*pi/180, -100*pi/180, 40*pi/180, 0]
+ROBOT_QR = [0, 0, 0, 0, 0]
 
 ACTIVE_MOTORS = [1, 2, 3, 4, 5]
 
@@ -75,6 +71,10 @@ class DXLMotorsController(Node):
         self.create_subscription(String, 'set_speed', self.__set_speed_callback, 10)
         self.create_subscription(Empty, 'disable_torque', self.__disable_torque_callback, 10)
         self.create_subscription(MotorCommand, '/motor_controller/command', self.__motor_cmd_callback, 10)
+
+        # print(self.robot)
+        # print(self.robot.fkine([0,0,0,0,0]))
+        # self.robot.plot([0,0,0,0,0], block=True)
 
 
     def arrow_movement(self, msg):
@@ -120,6 +120,10 @@ class DXLMotorsController(Node):
         # kroky motoru na uhel v kloubu DH modelu
         self.current_q = self.directions * (q_motor - self.offsets) / GEAR
 
+    def __pen_tilt(self, q):
+        Tq = self.robot.fkine(q)
+        return np.degrees(np.arccos(np.clip(-Tq.R[2, 2], -1, 1)))
+
     def coordsToSteps(self, x, y, z, max_tilt_deg=25):
         """
             max_tilt_deg o jak moc muze bejt pero nakloneno k base
@@ -128,37 +132,23 @@ class DXLMotorsController(Node):
         """
         T = SE3(x, y, z) * SE3.Rx(np.pi)          
 
-        # zkusit pero kolmo
-        sol = self.robot.ikine_LM(T, q0=self.robot.qr,      # tady to kdyztak zmenit kdyby se to snazilo natahnout rameno napr. pod desku, muze tam i bejt curr
-                                mask=[1, 1, 1, 1, 1, 0], joint_limits=True)
-
-        # kolmo nejde: zkus to nekolmo
-        if not sol.success:
-            sol = self.robot.ikine_LM(T, q0=sol.q,
-                                    mask=[1, 1, 1, 0, 0, 0], joint_limits=True)
-
-        if not sol.success:
-            raise ValueError(f"Bod ({x}, {y}, {z}) je mimo dosah robota")
-
-        q = np.array(sol.q)
-
-        # kontrola uhlu pera vuci base
-        Tq = self.robot.fkine(q)
-        tilt = np.degrees(np.arccos(np.clip(-Tq.R[2, 2], -1, 1)))
-        if tilt > max_tilt_deg:
-            raise ValueError(f"Bod ({x}, {y}, {z}): pero by bylo nakloněné o {tilt:.0f}°")
+        q = self.__solve_ik(T, x, y, max_tilt_deg)
+        if q is None:
+            raise ValueError(f"Bod ({x}, {y}, {z}) je mimo dosah")
 
         steps = []
         for i, angle in enumerate(q):
             a = self.directions[i] * GEAR[i] * angle + self.offsets[i]
             steps.append(rad2steps(a))
 
-        self.current_q = q
-        return steps
+        return steps, q
 
     def goToPos(self, x, y, z): # hlidat max min motoru
-        print(x, y, z)
-        steps = self.coordsToSteps(x, y, z)
+        try:
+            steps, q = self.coordsToSteps(x, y, z)
+        except ValueError as e:
+            self.get_logger().error(str(e))
+            return
 
         # check the limits
         for i, step in enumerate(steps):
@@ -166,13 +156,32 @@ class DXLMotorsController(Node):
                 return
 
         self.dxlMotors.setMotorsGoalPos(steps)
+        self.current_q = q
         self.get_logger().info(f'Moving motors to motor position: {steps}')
 
     def __motor_cmd_callback(self, msg):
         if msg.command == 'move':
             self.goToPos(msg.x, msg.y, msg.z)
 
-# x 400 y 0 z 0
+    def __seeds(self, x, y):
+        r = np.hypot(x, y)
+        q5 = pi if r < R_FLIP else 0.0          
+
+        preferred = np.array([0, 0, 0, -45*pi/180, q5])
+        other     = np.array([0, 0, 0, -45*pi/180, pi - q5])
+        return [preferred, other]
+
+    def __solve_ik(self, T, x, y, max_tilt_deg):
+        seeds = self.__seeds(x, y)
+
+        for mask in ([1, 1, 1, 1, 1, 0], [1, 1, 1, 0, 0, 0]):   # nejdriv kolmo, pak fallback
+            for q0 in seeds:                                    # nejdriv preferovana vetev
+                sol = self.robot.ikine_LM(T, q0=q0, mask=mask, joint_limits=True)
+                if sol.success and self.__pen_tilt(sol.q) <= max_tilt_deg:
+                    return np.array(sol.q)
+        return None
+
+
     # pro cli set_speed
     def __set_speed_callback(self, msg):
         dxl_id, speed = (int(v) for v in msg.data.split())
@@ -203,10 +212,10 @@ class DXLMotorsController(Node):
         robot = rtb.DHRobot(
                 [
                     rtb.RevoluteDH(d=LINK1, alpha=pi/2, qlim=JOINT1_LIM), 
-                    rtb.RevoluteDH(a=LINK2, qlim=JOINT2_LIM),
-                    rtb.RevoluteDH(a=LINK3, qlim=JOINT3_LIM),
-                    rtb.RevoluteDH(a=LINK4_OFFSET, alpha=pi/2, qlim=JOINT4_LIM),
-                    rtb.RevoluteDH(d=LINK4, a=LINK5_OFFSET, qlim=JOINT5_LIM),
+                    rtb.RevoluteDH(a=LINK2, qlim=JOINT2_LIM, offset=45*pi/180),
+                    rtb.RevoluteDH(a=LINK3, qlim=JOINT3_LIM, offset=-90*pi/180),
+                    rtb.RevoluteDH(a=LINK4_OFFSET, alpha=pi/2, qlim=JOINT4_LIM, offset=90*pi/180), # tady kdyztak a misto d
+                    rtb.RevoluteDH(d=LINK4, a=LINK5_OFFSET, qlim=JOINT5_LIM), # tady kdyztak a misto d a d misto a 
                 ], name="Robot arm")
         robot.qr = ROBOT_QR
 

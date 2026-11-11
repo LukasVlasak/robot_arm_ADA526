@@ -120,7 +120,7 @@ class OperatorNode(Node):
 	def __convert_coordinates(self, letter, number):
 		#0.025
 		number = int(number)
-		x = 600 - (number - 1) * 25
+		x = 575 - (number - 1) * 25
 		x = float(x / 1000)
 
 		ascii_code = int(ord(letter))
