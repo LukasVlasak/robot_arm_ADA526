@@ -46,6 +46,7 @@ class DXLMotors:
         self.__setExtendedOperatingMode()
         self.setDXLTorqueEnabled(True)
         self.setMotorsSpeed(45)
+        self.calibrateBase()
 
     def __open_port(self):
         if self.portHandler.openPort():
@@ -60,6 +61,25 @@ class DXLMotors:
         else:
             print("Failed to change the baudrate")
             quit()
+
+    def calibrateBase(self):
+        settings = [
+            (78, 100, 2), # Vel P Gain
+            (80, 400, 2), # Pos D Gain
+            (82, 500, 2), # Pos I Gain
+            (84, 1200, 2),# Pos P Gain
+            (108, 4, 4),  # Prof Acc
+            (112, 25, 4), # Prof Vel
+        ]
+
+        for addr, value, size in settings:
+            if size == 2:
+                dxl_comm_result, dxl_error = self.packetHandler.write2ByteTxRx(self.portHandler, 1, addr, value)
+            else:
+                dxl_comm_result, dxl_error = self.packetHandler.write4ByteTxRx(self.portHandler, 1, addr, value)
+
+            self.__checkRWResult(dxl_comm_result, dxl_error)
+
 
     # kvuli tem limitam a DH modelu ...
     def __setExtendedOperatingMode(self):
