@@ -11,6 +11,11 @@ from std_msgs.msg import String, Empty
 from robot_interfaces.msg import MotorCommand
 
 from robot_interfaces.action import Motor
+from rclpy.action import ActionServer, GoalResponse, CancelResponse
+import asyncio
+
+
+# TODO: self.current_q SE TED NEUPDATUJE - ZATIM NEPOUZIVAM TAKZE OK 
 
 
 HOME_POS_MOTORS = {
@@ -31,7 +36,7 @@ WEIGHT_POS_MOTORS = {
 LINK1 = 0.220
 LINK2 = 0.300
 LINK3 = 0.280
-LINK4 = 0.203
+LINK4 = 0.202
 LINK4_OFFSET = -0.00262
 LINK5_OFFSET = 0.043
 
@@ -151,11 +156,11 @@ class DXLMotorsController(Node):
             a = self.directions[i] * GEAR[i] * angle + self.offsets[i]
             steps.append(rad2steps(a))
 
-        return steps, q
+        return steps
 
     def goToPos(self, x, y, z): # hlidat max min motoru
         try:
-            steps, q = self.coordsToSteps(x, y, z)
+            steps = self.coordsToSteps(x, y, z)
         except ValueError as e:
             self.get_logger().error(str(e))
             return
@@ -256,19 +261,16 @@ class DXLMotorsController(Node):
             for i in range(len(moves)):
 
                 while self.dxlMotors.getMotorsMoving():
-                    if goal_handle.is_cancel_requested:
-                        goal_handle.canceled()
-                        return Motor.Result()
-
                     await asyncio.sleep(0.1)
 
-                if goal_handle.is_cancel_requested:
-                    goal_handle.canceled()
-                    return Motor.Result()
+                # if goal_handle.is_cancel_requested:
+                #     goal_handle.canceled()
+                #     return Motor.Result()
 
-                self.dxlMotors.setSingleMotorSpeed(i + 1, speeds[i])
+                self.dxlMotors.setMotorsSpeed(speeds[i])
                 self.makeMove(moves[i])
 
+            
             # Wait for the last movement to finish
             while self.dxlMotors.getMotorsMoving():
                 if goal_handle.is_cancel_requested:

@@ -40,6 +40,7 @@ class DXLMotors:
         self.goalPositionWriter = dxl.GroupSyncWrite(self.portHandler, self.packetHandler, self.addr_goal_position, self.len_goal_position)
         self.profileVelocityWriter = dxl.GroupSyncWrite(self.portHandler, self.packetHandler, self.addr_profile_velocity, self.len_profile_velocity)
         self.operatingModeWriter = dxl.GroupSyncWrite(self.portHandler, self.packetHandler, self.addr_operating_mode, 1)
+        self.isMovingReader = dxl.GroupSyncRead(self.portHandler, self.packetHandler, self.addr_is_moving, 1)
 
         # initial settings
         self.__setExtendedOperatingMode()
@@ -98,11 +99,24 @@ class DXLMotors:
         return is_moving == 1
         
     def getMotorsMoving(self):
-		for i in range(1, 6):
-			if getIsMoving(5):
-				return True
-		
-		return False
+        result = []
+
+        self.isMovingReader.clearParam()
+        for id in self.dxl_ids:
+            self.isMovingReader.addParam(id)
+
+        dxl_comm_result = self.isMovingReader.txRxPacket()
+        self.__checkRWResult(dxl_comm_result)
+
+        for id in self.dxl_ids:
+            is_available = self.isMovingReader.isAvailable(id, self.addr_is_moving, 1)
+
+            if not is_available:
+                raise RuntimeError("Data for group reading not available")
+
+            result.append(bool(self.isMovingReader.getData(id, self.addr_is_moving, 1)))
+
+        return any(result)
 
     def getSingleMotorPos(self, id):
         self.__checkID(id)
