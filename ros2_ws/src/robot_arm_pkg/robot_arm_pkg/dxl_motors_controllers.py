@@ -10,6 +10,8 @@ from utils import rad2steps, steps2rad
 from std_msgs.msg import String, Empty
 from robot_interfaces.msg import MotorCommand
 
+from robot_interfaces.action import Motor
+
 
 HOME_POS_MOTORS = {
     1: 1250,
@@ -76,6 +78,14 @@ class DXLMotorsController(Node):
         # print(self.robot.fkine([0,0,0,0,0]))
         # self.robot.plot([0,0,0,0,0], block=True)
 
+        self._action_server = ActionServer(
+            self,
+            Motor,
+            'motor',
+            execute_callback=self.execute_callback,
+            goal_callback=self.goal_callback,
+            cancel_callback=self.cancel_callback,
+        )
 
     def arrow_movement(self, msg):
         direction, dxl_id = msg.data.split()
@@ -150,14 +160,16 @@ class DXLMotorsController(Node):
             self.get_logger().error(str(e))
             return
 
+        self.makeMove(steps)
+        
+    def makeMove(self, steps):
         # check the limits
         for i, step in enumerate(steps):
             if not self.__check_motor_limits(i, self.__stepsToQ(i, step)):
                 return
 
         self.dxlMotors.setMotorsGoalPos(steps)
-        self.current_q = q
-        self.get_logger().info(f'Moving motors to motor position: {steps}')
+        self.get_logger().info(f'Moving motors to motor position: {steps}')    
 
     def __motor_cmd_callback(self, msg):
         if msg.command == 'move':
@@ -220,7 +232,64 @@ class DXLMotorsController(Node):
         robot.qr = ROBOT_QR
 
         return robot
-                 
+        
+    def goal_callback(self, goal_request):
+        return GoalResponse.ACCEPT
+
+    def cancel_callback(self, goal_handle):
+        self.get_logger().info('Cancel request received')
+        return CancelResponse.ACCEPT
+
+    async def execute_callback(self, goal_handle):
+        points = goal_handle.request.points
+        speeds = goal_handle.request.speeds
+
+        try:
+            moves = [
+                self.coordsToSteps(point.x, point.y, point.z)[0]
+                for point in points
+            ]
+
+            if len(moves) != len(speeds):
+                raise ValueError("Number of moves and speeds does not match")
+
+            for i in range(len(moves)):
+
+                while self.dxlMotors.getMotorsMoving():
+                    if goal_handle.is_cancel_requested:
+                        goal_handle.canceled()
+                        return Motor.Result()
+
+                    await asyncio.sleep(0.1)
+
+                if goal_handle.is_cancel_requested:
+                    goal_handle.canceled()
+                    return Motor.Result()
+
+                self.dxlMotors.setSingleMotorSpeed(i + 1, speeds[i])
+                self.makeMove(moves[i])
+
+            # Wait for the last movement to finish
+            while self.dxlMotors.getMotorsMoving():
+                if goal_handle.is_cancel_requested:
+                    goal_handle.canceled()
+                    return Motor.Result()
+
+                await asyncio.sleep(0.1)
+
+            goal_handle.succeed()
+
+            result = Motor.Result()
+            return result
+
+        except Exception as e:
+            self.get_logger().error(f"Execution failed: {e}")
+            goal_handle.abort()
+
+            return Motor.Result()
+
+
+               
         
 def main():
     rclpy.init()

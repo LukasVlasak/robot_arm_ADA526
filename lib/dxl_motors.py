@@ -96,6 +96,13 @@ class DXLMotors:
 
         self.__checkRWResult(dxl_comm_result, dxl_error)
         return is_moving == 1
+        
+    def getMotorsMoving(self):
+		for i in range(1, 6):
+			if getIsMoving(5):
+				return True
+		
+		return False
 
     def getSingleMotorPos(self, id):
         self.__checkID(id)
@@ -104,6 +111,8 @@ class DXLMotors:
         self.__checkRWResult(dxl_comm_result, dxl_error)
 
         return self.__toSigned32(position)
+        
+   	
     
     def getMotorsPos(self, ids=None):
         result = []
