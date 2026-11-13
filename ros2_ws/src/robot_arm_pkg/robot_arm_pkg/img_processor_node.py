@@ -39,9 +39,9 @@ class ImageProcessor(Node):
             '/goal_green_point',
             10)
 
-        self.pub_blue = self.create_publisher(
+        self.pub_red = self.create_publisher(
             point_msg,
-            '/goal_blue_point',
+            '/goal_red_point',
             10)
 
         self.br = CvBridge()
@@ -49,12 +49,12 @@ class ImageProcessor(Node):
         self.fig.add_subplot(2, 2, 1)   # axes[0] = color
         self.fig.add_subplot(2, 2, 2)   # axes[1] = depth
         self.fig.add_subplot(2, 2, 3)   # axes[2] = green mask
-        self.fig.add_subplot(2, 2, 4)   # axes[3] = blue mask
+        self.fig.add_subplot(2, 2, 4)   # axes[3] = red mask
 
         self.centroids_green = None
-        self.centroids_blue = None
+        self.centroids_red = None
         self.depth_green = 5.0
-        self.depth_blue = 5.0
+        self.depth_red = 5.0
         self.intrinsics = rs.intrinsics()
 
     # ------------------------------------------------------------------
@@ -135,8 +135,8 @@ class ImageProcessor(Node):
     def plot_centroids(self, ax):
         if self.centroids_green is not None:
             ax.plot(self.centroids_green[0], self.centroids_green[1], 'go')
-        if self.centroids_blue is not None:
-            ax.plot(self.centroids_blue[0], self.centroids_blue[1], 'bo')
+        if self.centroids_red is not None:
+            ax.plot(self.centroids_red[0], self.centroids_red[1], 'bo')
 
     def plot_color(self, img):
         ax = self.fig.axes[0]
@@ -152,7 +152,7 @@ class ImageProcessor(Node):
         self.plot_centroids(ax)
         img.disp(fig=self.fig, ax=ax, fps=30)
 
-    def plot_masks(self, mask_green, mask_blue):
+    def plot_masks(self, mask_green, mask_red):
         ax = self.fig.axes[2]
         ax.cla()
         ax.title.set_text("Mask green (white = green)")
@@ -161,9 +161,9 @@ class ImageProcessor(Node):
 
         ax = self.fig.axes[3]
         ax.cla()
-        ax.title.set_text("Mask blue (white = blue)")
+        ax.title.set_text("Mask red (white = red)")
         self.plot_centroids(ax)
-        mask_blue.disp(fig=self.fig, ax=ax, fps=30)
+        mask_red.disp(fig=self.fig, ax=ax, fps=30)
 
     # ------------------------------------------------------------------
     # Callbacks
@@ -180,8 +180,8 @@ class ImageProcessor(Node):
         a_img = a.image.astype(np.float32)
         b_img = b.image.astype(np.float32)
 
-        thr_a = 105      
-        thr_b = 90
+        thr_a = 108      
+        thr_b = 148
         L_ref = 128      
         L_min = 20       
 
@@ -190,25 +190,26 @@ class ImageProcessor(Node):
         thr_a_L = 128 - (128 - thr_a) * k
         thr_b_L = 128 - (128 - thr_b) * k
 
+
         green = (a_img < thr_a_L) & (L > L_min)
         mask_green = mvt.Image(green.astype(np.uint8) * 255)
         mask_green = mask_green.open(np.ones((5, 5))).close(np.ones((9, 9)))
 
-        blue = (b_img < thr_b_L) & (L > L_min)
-        mask_blue = mvt.Image(blue.astype(np.uint8) * 255)
-        mask_blue = mask_blue.open(np.ones((5, 5))).close(np.ones((9, 9)))
+        red = (b_img < thr_b_L) & (L > L_min)
+        mask_red = mvt.Image(red.astype(np.uint8) * 255)
+        mask_red = mask_red.open(np.ones((5, 5))).close(np.ones((9, 9)))
 
         self.centroids_green = self.find_centroids(mask_green)
-        self.centroids_blue = self.find_centroids(mask_blue)
+        self.centroids_red = self.find_centroids(mask_red)
 
         self.process_ball("green", self.centroids_green,
                           self.depth_green, self.pub_green)
-        self.process_ball("blue", self.centroids_blue,
-                          self.depth_blue, self.pub_blue)
+        self.process_ball("red", self.centroids_red,
+                          self.depth_red, self.pub_red)
 
         ## plotting (only recommended for debugging):
-        self.plot_color(img)
-        self.plot_masks(mask_green, mask_blue)
+        ## self.plot_color(img)
+        ## self.plot_masks(mask_green, mask_red)
 
     def sub_intrinsics_callback(self, msg):
         self.intrinsics.width = msg.width
@@ -225,10 +226,10 @@ class ImageProcessor(Node):
         img = mvt.Image(current_frame)
 
         self.depth_green = self.read_depth(img, self.centroids_green, self.depth_green)
-        self.depth_blue = self.read_depth(img, self.centroids_blue, self.depth_blue)
+        self.depth_red = self.read_depth(img, self.centroids_red, self.depth_red)
 
         ## plotting (only recommended for debugging):
-        self.plot_depth(img)
+       ## self.plot_depth(img)
 
 
 def main(args=None):

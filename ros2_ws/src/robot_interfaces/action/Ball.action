@@ -1,0 +1,9 @@
+# Goal
+string first_ball
+---
+# Result
+bool success
+string message
+---
+# Feedback
+float64 progress

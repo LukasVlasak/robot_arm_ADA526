@@ -11,6 +11,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 
   # Actions
   "action/Precision.action"
+  "action/Ball.action"
+  "action/Motor.action"
 
 )
 

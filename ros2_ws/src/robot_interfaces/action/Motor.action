@@ -1,0 +1,11 @@
+# Goal
+geometry_msgs/Point[] points
+float32[] speeds
+---
+# Result
+bool success
+string message
+---
+#Feedback
+uint32 current_point
+float32 distance_remaining

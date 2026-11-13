@@ -24,6 +24,7 @@ setup(
             'arrow_movement_testing_pub = robot_arm_pkg.arrow_movement_testing_pub:main',
             'dxl_motors_controllers = robot_arm_pkg.dxl_motors_controllers:main',
             'operator = robot_arm_pkg.operator_node:main',
+            'ball_transformer_node = robot_arm_pkg.ball_transformer_node:main',
 
 
             # jednorazove console skripty
