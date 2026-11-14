@@ -45,7 +45,7 @@ class DXLMotors:
         # initial settings
         self.__setExtendedOperatingMode()
         self.setDXLTorqueEnabled(True)
-        self.setMotorsSpeed(45)
+        self.setMotorsSpeed([45] * len(self.dxl_ids))
         self.calibrateBase()
 
     def __open_port(self):
@@ -193,17 +193,22 @@ class DXLMotors:
         # 4. ČIŠTĚNÍ PO ODESLÁNÍ (Doporučená praxe pro vyčištění paměti)
         self.goalPositionWriter.clearParam()
 
-    def setMotorsSpeed(self, speed):
+    def setMotorsSpeed(self, speeds):
         """
+            Prijme pole rychlosti - jedna pro kazdy motor (poradi dle dxl_ids).
             42 - 45 mega pomaly
             46-52 ty MAGOREEEEEE
         """
-        self.profileVelocityWriter.clearParam()
-        
-        param_velocity_43 = utils.to4bytes(speed)[0]
+        if len(speeds) != len(self.dxl_ids):
+            print("DEMENTE POCET SPEEDU NESEDI S POCTEM MOTORU")
+            return
 
-        for dxl_id in self.dxl_ids:
-            self.profileVelocityWriter.addParam(dxl_id, param_velocity_43)
+        self.profileVelocityWriter.clearParam()
+
+        params = utils.to4bytes([int(s) for s in speeds])
+
+        for i, dxl_id in enumerate(self.dxl_ids):
+            self.profileVelocityWriter.addParam(dxl_id, params[i])
 
         dxl_comm_result = self.profileVelocityWriter.txPacket()
         self.__checkRWResult(dxl_comm_result)

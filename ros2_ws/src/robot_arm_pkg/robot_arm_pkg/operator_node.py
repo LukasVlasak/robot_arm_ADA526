@@ -5,6 +5,7 @@ from rclpy.node import Node
 from rclpy.action import ActionClient
 
 from robot_interfaces.action import Ball
+from robot_interfaces.action import Precision
 from robot_interfaces.msg import MotorCommand
 from action_msgs.msg import GoalStatus
 
@@ -28,6 +29,13 @@ class OperatorNode(Node):
             'ball'
         )
 
+        # Precision Action Client
+        self.precision_client = ActionClient(
+            self,
+            Precision,
+            'precision'
+        )
+
         self.get_logger().info('Operator node initialized')
 
         # CLI input thread
@@ -49,6 +57,7 @@ class OperatorNode(Node):
         print('  home')
         print('  weight')
         print('  move K 10 z')
+        print('  precision K 10')
         print('  ball green')
         print('  ball red')
         print('  exit')
@@ -72,6 +81,9 @@ class OperatorNode(Node):
 
                 elif command == 'move':
                     self.handle_move(args)
+
+                elif command == 'precision':
+                    self.handle_precision(args)
 
                 elif command == 'ball':
                     self.handle_ball(args)
@@ -132,6 +144,97 @@ class OperatorNode(Node):
         self.get_logger().info(
             f'Published position: x={x}, y={y}, z={z}'
         )
+
+    # ==========================================
+    # PRECISION ACTION CLIENT
+    # ==========================================
+
+    def handle_precision(self, args):
+
+        if len(args) != 3:
+            print('Usage: precision K 10')
+            return
+
+        letter = args[1]
+        number = int(args[2])
+
+        x, y = self.__convert_coordinates(letter, number)
+        z = 0.005
+
+        if not self.precision_client.wait_for_server(timeout_sec=5.0):
+            print('Precision action server not available')
+            return
+
+        goal = Precision.Goal()
+        goal.x = x
+        goal.y = y
+        goal.z = z
+
+        self.get_logger().info(
+            f'Sending Precision goal: x={x}, y={y}, z={z}'
+        )
+
+        send_goal_future = self.precision_client.send_goal_async(goal)
+
+        event = threading.Event()
+        result_data = {}
+
+        def result_callback(future):
+            try:
+                result_data['result'] = future.result()
+            except Exception as e:
+                result_data['error'] = e
+            finally:
+                event.set()
+
+        def goal_response_callback(future):
+            try:
+                goal_handle = future.result()
+
+                if not goal_handle.accepted:
+                    result_data['accepted'] = False
+                    event.set()
+                    return
+
+                result_data['accepted'] = True
+
+                result_future = goal_handle.get_result_async()
+                result_future.add_done_callback(result_callback)
+
+            except Exception as e:
+                result_data['error'] = e
+                event.set()
+
+        send_goal_future.add_done_callback(goal_response_callback)
+
+        print('Waiting for PrecisionNode...')
+
+        event.wait()
+
+        if 'error' in result_data:
+            print(f'Precision action error: {result_data["error"]}')
+            return
+
+        if not result_data.get('accepted', False):
+            print('Precision goal rejected')
+            return
+
+        response = result_data['result']
+
+        if response.status == GoalStatus.STATUS_SUCCEEDED:
+            if response.result.success:
+                print(f'Precision action successful: {response.result.message}')
+            else:
+                print(f'Precision action failed: {response.result.message}')
+
+        elif response.status == GoalStatus.STATUS_ABORTED:
+            print('Precision action aborted')
+
+        elif response.status == GoalStatus.STATUS_CANCELED:
+            print('Precision action canceled')
+
+        else:
+            print(f'Unknown result status: {response.status}')
 
     # ==========================================
     # BALL ACTION CLIENT

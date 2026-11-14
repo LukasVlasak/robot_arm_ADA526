@@ -7,6 +7,7 @@ from action_msgs.msg import GoalStatus
 
 from robot_interfaces.action import Ball
 from robot_interfaces.action import Motor
+from robot_interfaces.msg import MotorSpeeds
 
 from geometry_msgs.msg import PointStamped
 
@@ -65,7 +66,8 @@ class BallNode(Node):
 
         goal = Motor.Goal()
         goal.points = points
-        goal.speeds = speeds
+        goal.speeds = [MotorSpeeds(speeds=s) for s in speeds]
+        goal.is_ball_action = True  # ball -> predpocita vsechnu kinematiku dopredu, bez ustalovani
 
         send_goal_future = self.motor_client.send_goal_async(goal)
 
@@ -172,9 +174,10 @@ class BallNode(Node):
                 second_point
             ]
 
+            # jedna hodnota na motor (poradi dle ACTIVE_MOTORS), zatim vsude stejne
             speeds = [
-                42.0,
-                46.0 # .0 dulezite - prevadi na float
+                [42.0, 42.0, 42.0, 42.0, 42.0],  # prvni micek
+                [46.0, 46.0, 46.0, 46.0, 46.0],  # druhy micek
             ]
 
             success = await self.move_robot(points, speeds)

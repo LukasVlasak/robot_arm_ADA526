@@ -1,6 +1,7 @@
 # Goal
 geometry_msgs/Point[] points
-float32[] speeds
+MotorSpeeds[] speeds  # jedna MotorSpeeds (pole rychlosti na motor) na kazdy bod
+bool is_ball_action  # true = ball (predpocita vse, rychle), false = precision (po kazdem bodu ustaleni)
 ---
 # Result
 bool success

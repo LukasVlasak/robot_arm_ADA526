@@ -9,6 +9,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 
   # Messages
   "msg/MotorCommand.msg"
+  "msg/MotorSpeeds.msg"
 
   # Actions
   "action/Precision.action"

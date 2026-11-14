@@ -34,6 +34,18 @@ WEIGHT_POS_MOTORS = {
     5: 1250,
 }
 
+# bod (-1, -1, -1) v Motor akci znamena "jed do HOME pozice"
+HOME_SENTINEL = -1.0
+
+# jak dlouho cekat po dojezdu na bod, nez se rameno dokmita [s]
+SETTLE_TIME = 2.0
+
+# precision potrebuje pero vic kolmo k desce nez micek -> mensi povoleny naklon [deg]
+PRECISION_MAX_TILT_DEG = 10
+
+# pauza po zadani pohybu, nez motory nabehnou a is_moving spolehlive hlasi pohyb [s]
+MOVE_START_DELAY = 0.2
+
 LINK1 = 0.220
 LINK2 = 0.300
 LINK3 = 0.280
@@ -292,45 +304,96 @@ class DXLMotorsController(Node):
         self.get_logger().info('Cancel request received')
         return CancelResponse.ACCEPT
 
+    def __is_home_point(self, point):
+        return (point.x == HOME_SENTINEL
+                and point.y == HOME_SENTINEL
+                and point.z == HOME_SENTINEL)
+
+    # --------------------------------------------------
+    # SPOLECNE POHYBOVE METODY (ball i precision)
+    # --------------------------------------------------
+
+    # ceka dokud se motory tocej; vraci False pokud prisel cancel
+    def __wait_until_stopped(self, goal_handle):
+        # kratka pauza, aby motory stacily nabehnout a is_moving spolehlive hlasil pohyb
+        time.sleep(MOVE_START_DELAY)
+
+        while self.dxlMotors.getMotorsMoving():
+            if goal_handle.is_cancel_requested:
+                return False
+            time.sleep(0.1)
+        return True
+
+    # nastavi rychlosti (pole - jedna na motor) a jede na jeden bod (karteziansky, nebo HOME sentinel)
+    def __move_to_point(self, point, speeds, max_tilt_deg=25):
+        self.dxlMotors.setMotorsSpeed(speeds)
+
+        if self.__is_home_point(point):
+            self.get_logger().info('Moving to HOME')
+            self.makeMove([HOME_POS_MOTORS[m] for m in ACTIVE_MOTORS])
+        else:
+            steps = self.coordsToSteps(point.x, point.y, point.z, max_tilt_deg)
+            self.get_logger().info(f'Moving to point: speeds={speeds}, steps={steps}')
+            self.makeMove(steps)
+
+    # --------------------------------------------------
+    # SEKVENCE BODU
+    # --------------------------------------------------
+
+    # ball: DULEZITE - spocita vsechnu kinematiku DOPREDU (soutez meri cas pohybu),
+    # pak jede body za sebou a ceka jen na dokonceni pohybu
+    async def __run_ball_sequence(self, goal_handle, points, speeds):
+        moves = [
+            self.coordsToSteps(point.x, point.y, point.z)
+            for point in points
+        ]
+
+        for i, steps in enumerate(moves):
+            if not self.__wait_until_stopped(goal_handle):
+                return False
+
+            self.dxlMotors.setMotorsSpeed(speeds[i].speeds)
+            self.makeMove(steps)
+
+        return self.__wait_until_stopped(goal_handle)
+
+    # precision: jako ball, ale po dojezdu na kazdy bod necha rameno SETTLE_TIME ustalit
+    async def __run_precision_sequence(self, goal_handle, points, speeds):
+        for i, point in enumerate(points):
+            if not self.__wait_until_stopped(goal_handle):
+                return False
+
+            self.__move_to_point(point, speeds[i].speeds, PRECISION_MAX_TILT_DEG)
+
+            # pockej, nez rameno dojede, a pak nez se dokmita
+            if not self.__wait_until_stopped(goal_handle):
+                return False
+
+            time.sleep(SETTLE_TIME)
+
+        return True
+
     async def execute_callback(self, goal_handle):
         points = goal_handle.request.points
         speeds = goal_handle.request.speeds
 
         try:
-            moves = [
-                self.coordsToSteps(point.x, point.y, point.z)
-                for point in points
-            ]
+            if len(points) != len(speeds):
+                raise ValueError("Number of points and speeds does not match")
 
-            if len(moves) != len(speeds):
-                raise ValueError("Number of moves and speeds does not match")
+            # is_ball_action flag z Motor goalu rozhoduje: ball predpocita vse dopredu
+            # a jede bez ustalovani, precision necha po kazdem bodu rameno ustalit
+            if goal_handle.request.is_ball_action:
+                completed = await self.__run_ball_sequence(goal_handle, points, speeds)
+            else:
+                completed = await self.__run_precision_sequence(goal_handle, points, speeds)
 
-            for i in range(len(moves)):
-
-                while self.dxlMotors.getMotorsMoving():
-                    time.sleep(0.1)
-
-                # if goal_handle.is_cancel_requested:
-                #     goal_handle.canceled()
-                #     return Motor.Result()
-                print(speeds[i])
-                print(moves[i])
-                self.dxlMotors.setMotorsSpeed(int(speeds[i]))
-                self.makeMove(moves[i])
-
-            
-            # Wait for the last movement to finish
-            while self.dxlMotors.getMotorsMoving():
-                if goal_handle.is_cancel_requested:
-                    goal_handle.canceled()
-                    return Motor.Result()
-
-                time.sleep(0.1)
+            if not completed:
+                goal_handle.canceled()
+                return Motor.Result()
 
             goal_handle.succeed()
-
-            result = Motor.Result()
-            return result
+            return Motor.Result()
 
         except Exception as e:
             self.get_logger().error(f"Execution failed: {e}")
