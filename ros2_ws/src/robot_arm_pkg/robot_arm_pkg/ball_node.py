@@ -2,8 +2,8 @@ import asyncio
 
 import rclpy
 from rclpy.node import Node
-from rclpy.action import ActionServer, ActionClient
-from rclpy.action import GoalResponse, CancelResponse, GoalStatus
+from rclpy.action import ActionServer, ActionClient, GoalResponse, CancelResponse
+from action_msgs.msg import GoalStatus
 
 from robot_interfaces.action import Ball
 from robot_interfaces.action import Motor
@@ -173,8 +173,8 @@ class BallNode(Node):
             ]
 
             speeds = [
-                42,
-                46
+                42.0,
+                46.0 # .0 dulezite - prevadi na float
             ]
 
             success = await self.move_robot(points, speeds)

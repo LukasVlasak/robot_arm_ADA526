@@ -13,6 +13,7 @@ from robot_interfaces.msg import MotorCommand
 from robot_interfaces.action import Motor
 from rclpy.action import ActionServer, GoalResponse, CancelResponse
 import asyncio
+import time
 
 
 # TODO: self.current_q SE TED NEUPDATUJE - ZATIM NEPOUZIVAM TAKZE OK 
@@ -47,7 +48,7 @@ JOINT4_LIM = [ -92*pi/180, 85*pi/180] # odecetl jsem 5 stupnu v zapornych i v kl
 JOINT5_LIM = [-180*pi/180, 180*pi/180]
 
 # jsem dat primo namerenou hodnotu curr pos motoru kdyz bude sedet s DH modelem
-DH_OFFSETS = [2114, 2002, 4093, 2351, 5]
+DH_OFFSETS = [2112, 2009, 4172, 2330, 16]
 DIRECTIONS = [1, -1, -1, -1, 1]
 
 R_FLIP = 0.2 # kdy pero natocito 180 jako vychozi hodnota solveru
@@ -251,7 +252,7 @@ class DXLMotorsController(Node):
 
         try:
             moves = [
-                self.coordsToSteps(point.x, point.y, point.z)[0]
+                self.coordsToSteps(point.x, point.y, point.z)
                 for point in points
             ]
 
@@ -261,13 +262,14 @@ class DXLMotorsController(Node):
             for i in range(len(moves)):
 
                 while self.dxlMotors.getMotorsMoving():
-                    await asyncio.sleep(0.1)
+                    time.sleep(0.1)
 
                 # if goal_handle.is_cancel_requested:
                 #     goal_handle.canceled()
                 #     return Motor.Result()
-
-                self.dxlMotors.setMotorsSpeed(speeds[i])
+                print(speeds[i])
+                print(moves[i])
+                self.dxlMotors.setMotorsSpeed(int(speeds[i]))
                 self.makeMove(moves[i])
 
             
@@ -277,7 +279,7 @@ class DXLMotorsController(Node):
                     goal_handle.canceled()
                     return Motor.Result()
 
-                await asyncio.sleep(0.1)
+                time.sleep(0.1)
 
             goal_handle.succeed()
 

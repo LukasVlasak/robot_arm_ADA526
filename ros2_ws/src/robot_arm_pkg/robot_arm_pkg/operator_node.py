@@ -3,10 +3,10 @@ import threading
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
-from rclpy.action import GoalStatus
 
 from robot_interfaces.action import Ball
 from robot_interfaces.msg import MotorCommand
+from action_msgs.msg import GoalStatus
 
 
 class OperatorNode(Node):
