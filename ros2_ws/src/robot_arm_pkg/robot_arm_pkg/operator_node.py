@@ -241,7 +241,7 @@ class OperatorNode(Node):
 
         number = int(number)
 
-        x = 600 - (number - 1) * 25
+        x = 600 - (number) * 25
         x = float(x / 1000)
 
         ascii_code = int(ord(letter))

@@ -48,7 +48,7 @@ JOINT4_LIM = [ -92*pi/180, 85*pi/180] # odecetl jsem 5 stupnu v zapornych i v kl
 JOINT5_LIM = [-180*pi/180, 180*pi/180]
 
 # jsem dat primo namerenou hodnotu curr pos motoru kdyz bude sedet s DH modelem
-DH_OFFSETS = [2112, 2009, 4172, 2330, 16]
+DH_OFFSETS = [2106, -2073, 8138, 2356, 4]
 DIRECTIONS = [1, -1, -1, -1, 1]
 
 R_FLIP = 0.2 # kdy pero natocito 180 jako vychozi hodnota solveru
@@ -64,6 +64,14 @@ GEAR = np.array([1, 4, 3, 1, 1]) # kdyz nebude fungovat tak toto upravit
 # just for testing
 ARROW_UPDATE_EVERY = 20 # update current_q every 10 steps
 
+# --- kompenzace pruhybu ---
+# realne zmerena poloha hrotu [x, y, z] v metrech v kalibracni poloze CALIB_Q se ZAPNUTYM torque
+# po kazde nove kalibraci zmerit a prepsat; None = kompenzace vypnuta
+CALIB_MEASURED_XYZ = [0.591, 0.0, 0.106]
+CALIB_Q = [0, 0, 0, 0, 0]
+# pruhyb ramene (kloub 2) podle vodorovneho dosahu zapesti [rad/m], z fitu namerenych bodu
+SAG_K2 = -0.051
+
 class DXLMotorsController(Node):
     def __init__(self):
         super().__init__("dxl_motors_controllers")
@@ -74,6 +82,7 @@ class DXLMotorsController(Node):
         self.directions = DIRECTIONS
         self.current_q = np.array(self.robot.qr, dtype=float)
         self.arrow_counter = 0
+        self.q_bias = self.__compute_joint_bias()
         
         self.create_subscription(String, 'arrow_user_input', self.arrow_movement, 10)
         self.create_subscription(String, 'set_speed', self.__set_speed_callback, 10)
@@ -83,6 +92,8 @@ class DXLMotorsController(Node):
         # print(self.robot)
         # print(self.robot.fkine([0,0,0,0,0]))
         # self.robot.plot([0,0,0,0,0], block=True)
+        print(self.robot.fkine([0,0,0,0,0]))
+        print(self.robot.fkine([2100, 2009, 4172, 2330, 16]))
 
         self._action_server = ActionServer(
             self,
@@ -152,12 +163,47 @@ class DXLMotorsController(Node):
         if q is None:
             raise ValueError(f"Bod ({x}, {y}, {z}) je mimo dosah")
 
+        self.get_logger().info(f'IK q [deg]: {np.round(np.degrees(q), 2)}, tilt: {self.__pen_tilt(q):.1f}')
+        q = self.__correct_q(q)
+
         steps = []
         for i, angle in enumerate(q):
             a = self.directions[i] * GEAR[i] * angle + self.offsets[i]
             steps.append(rad2steps(a))
 
         return steps
+
+    # vodorovna vzdalenost zapesti (kloub 4) od osy zakladny
+    def __wrist_reach(self, q):
+        a2 = q[1] + self.robot.links[1].offset
+        a3 = a2 + q[2] + self.robot.links[2].offset
+        return LINK2 * np.cos(a2) + LINK3 * np.cos(a3)
+
+    # z rozdilu mezi zmerenou a modelovou polohou hrotu v CALIB_Q dopocita offsety kloubu 1-3
+    def __compute_joint_bias(self):
+        bias = np.zeros(5)
+        if CALIB_MEASURED_XYZ is None:
+            return bias
+
+        q0 = np.array(CALIB_Q, dtype=float)
+        err = np.array(CALIB_MEASURED_XYZ, dtype=float) - self.robot.fkine(q0).t
+        J = self.robot.jacob0(q0)[:3, :3]
+        bias[:3] = np.linalg.lstsq(J, err, rcond=None)[0]
+
+        self.get_logger().info(f'Kompenzace: chyba hrotu v CALIB_Q [mm]: {np.round(err * 1000, 1)}, '
+                               f'offsety kloubu 1-3 [deg]: {np.round(np.degrees(bias[:3]), 2)}')
+        if np.any(np.abs(bias) > np.radians(8)):
+            self.get_logger().warn('Kompenzace: offset kloubu > 8 deg, zkontroluj CALIB_MEASURED_XYZ')
+        return bias
+
+    # realny uhel kloubu = zadany + delta, takze zadavame q - delta
+    def __correct_q(self, q):
+        if CALIB_MEASURED_XYZ is None:
+            return q
+
+        delta = self.q_bias.copy()
+        delta[1] += SAG_K2 * (self.__wrist_reach(q) - self.__wrist_reach(CALIB_Q))
+        return np.array(q) - delta
 
     def goToPos(self, x, y, z): # hlidat max min motoru
         try:
