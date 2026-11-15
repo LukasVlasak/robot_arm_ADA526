@@ -39,7 +39,7 @@ HOME_SENTINEL = -1.0
 
 # jak dlouho cekat po dojezdu na bod, nez se rameno dokmita [s]
 SETTLE_TIME_HIGH = 4
-SETTLE_TIME_LOW = 0.2
+SETTLE_TIME_LOW = 0.1
 
 # precision potrebuje pero vic kolmo k desce nez micek -> mensi povoleny naklon [deg]
 PRECISION_MAX_TILT_DEG = 10
