@@ -36,7 +36,8 @@ setup(
 
             # Jednorazove console skripty
             'set_speed = robot_arm_pkg.set_motor_speed_pub:main',
-            'disable_torque = robot_arm_pkg.disable_motor_torque_pub:main'
+            'disable_torque = robot_arm_pkg.disable_motor_torque_pub:main',
+            'go_home = robot_arm_pkg.go_home_pub:main'
         ],
     },
 )

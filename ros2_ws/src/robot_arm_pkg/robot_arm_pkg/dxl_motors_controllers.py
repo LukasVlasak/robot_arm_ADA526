@@ -99,6 +99,7 @@ class DXLMotorsController(Node):
         self.create_subscription(String, 'arrow_user_input', self.arrow_movement, 10)
         self.create_subscription(String, 'set_speed', self.__set_speed_callback, 10)
         self.create_subscription(Empty, 'disable_torque', self.__disable_torque_callback, 10)
+        self.create_subscription(Empty, 'go_home', self.__go_home_callback, 10)
         self.create_subscription(MotorCommand, '/motor_controller/command', self.__motor_cmd_callback, 10)
 
         # print(self.robot)
@@ -266,6 +267,11 @@ class DXLMotorsController(Node):
     # pro cli disable_torque
     def __disable_torque_callback(self, msg):
         self.dxlMotors.setDXLTorqueEnabled(False)
+
+    # pro cli go_home
+    def __go_home_callback(self, msg):
+        self.dxlMotors.setMotorsGoalPos(list(HOME_POS_MOTORS.values()))
+        self.get_logger().info('Going home...')
 
     def setMotorSpeed(self, dxl_id, speed):
         self.dxlMotors.setSingleMotorSpeed(dxl_id, speed)
