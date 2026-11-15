@@ -20,11 +20,11 @@ import time
 
 
 HOME_POS_MOTORS = {
-    1: 2109,
+    1: 2110,
     2: 4845,
     3: 523,
     4: 3016,
-    5: 66,
+    5: 21,
 }
 WEIGHT_POS_MOTORS = {
     1: 1250,
@@ -38,7 +38,8 @@ WEIGHT_POS_MOTORS = {
 HOME_SENTINEL = -1.0
 
 # jak dlouho cekat po dojezdu na bod, nez se rameno dokmita [s]
-SETTLE_TIME = 2.0
+SETTLE_TIME_HIGH = 4
+SETTLE_TIME_LOW = 0.5
 
 # precision potrebuje pero vic kolmo k desce nez micek -> mensi povoleny naklon [deg]
 PRECISION_MAX_TILT_DEG = 10
@@ -60,7 +61,7 @@ JOINT4_LIM = [ -92*pi/180, 85*pi/180] # odecetl jsem 5 stupnu v zapornych i v kl
 JOINT5_LIM = [-180*pi/180, 180*pi/180]
 
 # jsem dat primo namerenou hodnotu curr pos motoru kdyz bude sedet s DH modelem
-DH_OFFSETS = [2109, 6016, -1, 2338, 26]
+DH_OFFSETS = [2110, 6067, 41, 2317, 21]
 DIRECTIONS = [1, -1, -1, -1, 1]
 
 R_FLIP = 0.2 # kdy pero natocito 180 jako vychozi hodnota solveru
@@ -79,7 +80,7 @@ ARROW_UPDATE_EVERY = 20 # update current_q every 10 steps
 # --- kompenzace pruhybu ---
 # realne zmerena poloha hrotu [x, y, z] v metrech v kalibracni poloze CALIB_Q se ZAPNUTYM torque
 # po kazde nove kalibraci zmerit a prepsat; None = kompenzace vypnuta
-CALIB_MEASURED_XYZ = [0.582, 0.0, 0.095]
+CALIB_MEASURED_XYZ = [0.580, 0.0, 0.098]
 CALIB_Q = [0, 0, 0, 0, 0]
 # pruhyb ramene (kloub 2) podle vodorovneho dosahu zapesti [rad/m], z fitu namerenych bodu
 SAG_K2 = -0.051
@@ -371,11 +372,14 @@ class DXLMotorsController(Node):
 
             self.__move_to_point(point, speeds[i].speeds, PRECISION_MAX_TILT_DEG)
 
-            # pockej, nez rameno dojede, a pak nez se dokmita
             if not self.__wait_until_stopped(goal_handle):
                 return False
-
-            time.sleep(SETTLE_TIME)
+            # po najeti nad bod, pockat nez se dokmita
+            
+            if (i == 0):
+                time.sleep(SETTLE_TIME_HIGH)
+            else:
+                time.sleep(SETTLE_TIME_LOW)
 
         return True
 

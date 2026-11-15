@@ -28,7 +28,7 @@ PRESS_DEPTH = 0.002
 # zatim vsude stejne cislo, uprav si jednotlive motory podle potreby
 # base (motor 1, prvni v poradi) ma -1 -> rychlost se mu NEnastavuje
 SPEED_TRAVEL = [-1.0, 46.0, 46.0, 46.0, 46.0]  # home -> nad tecku (rychle, vysoko nad deskou)
-SPEED_TOUCH = [-1.0, 16.0, 16.0, 16.0, 16.0]   # klesani z approach az na tecku (pomalu, presne)
+SPEED_TOUCH = [-1.0, 7.0, 7.0, 20.0, 20.0]   # klesani z approach az na tecku (pomalu, presne)
 SPEED_LIFT = [-1.0, 40.0, 40.0, 40.0, 40.0]    # zvednuti od papiru
 SPEED_HOME = [-1.0, 46.0, 46.0, 46.0, 46.0]    # navrat do home
 
@@ -79,7 +79,6 @@ class PrecisionNode(Node):
         points = [
             # 1) bezpecne vysoko primo nad teckou (z home sem)
             self.__make_point(x, y, z + APPROACH_HEIGHT),
-            self.__make_point(x, y, z + APPROACH_HEIGHT / 2),
             # 2) dotyk - pomalu kolmo dolu, zajede pod povrch -> tecka
             self.__make_point(x, y, z - PRESS_DEPTH),
             # 3) zvednuti kolmo nahoru od papiru
@@ -90,7 +89,6 @@ class PrecisionNode(Node):
 
         speeds = [
             SPEED_TRAVEL,
-            SPEED_TOUCH,
             SPEED_TOUCH,
             SPEED_LIFT,
             SPEED_HOME,
