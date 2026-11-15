@@ -79,6 +79,7 @@ class PrecisionNode(Node):
         points = [
             # 1) bezpecne vysoko primo nad teckou (z home sem)
             self.__make_point(x, y, z + APPROACH_HEIGHT),
+            self.__make_point(x, y, z + APPROACH_HEIGHT / 2),
             # 2) dotyk - pomalu kolmo dolu, zajede pod povrch -> tecka
             self.__make_point(x, y, z - PRESS_DEPTH),
             # 3) zvednuti kolmo nahoru od papiru
@@ -89,6 +90,7 @@ class PrecisionNode(Node):
 
         speeds = [
             SPEED_TRAVEL,
+            SPEED_TOUCH,
             SPEED_TOUCH,
             SPEED_LIFT,
             SPEED_HOME,
