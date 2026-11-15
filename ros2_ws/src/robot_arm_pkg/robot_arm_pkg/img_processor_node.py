@@ -175,27 +175,22 @@ class ImageProcessor(Node):
 
         lab = img.colorspace('lab')
         L = lab.plane(0).image.astype(np.float32)
-        a = lab.plane(1)
-        b = lab.plane(2)
-        a_img = a.image.astype(np.float32)
-        b_img = b.image.astype(np.float32)
+        a_img = lab.plane(1).image.astype(np.float32)
 
-        thr_a = 108      
-        thr_b = 148
-        L_ref = 128      
-        L_min = 20       
+        thr_a_green = 108 
+        thr_a_red = 150    
+        L_ref = 128
+        L_min = 20
 
+        k = np.clip(L / L_ref, 0.3, 1.0)
+        thr_g = 128 - (128 - thr_a_green) * k
+        thr_r = 128 + (thr_a_red - 128) * k    
 
-        k = np.clip(L / L_ref, 0.3, 1.0)               
-        thr_a_L = 128 - (128 - thr_a) * k
-        thr_b_L = 128 - (128 - thr_b) * k
+        green = (a_img < thr_g) & (L > L_min)
+        red   = (a_img > thr_r) & (L > L_min)
 
-
-        green = (a_img < thr_a_L) & (L > L_min)
         mask_green = mvt.Image(green.astype(np.uint8) * 255)
         mask_green = mask_green.open(np.ones((5, 5))).close(np.ones((9, 9)))
-
-        red = (b_img < thr_b_L) & (L > L_min)
         mask_red = mvt.Image(red.astype(np.uint8) * 255)
         mask_red = mask_red.open(np.ones((5, 5))).close(np.ones((9, 9)))
 

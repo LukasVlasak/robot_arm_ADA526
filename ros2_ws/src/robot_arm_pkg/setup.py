@@ -1,4 +1,6 @@
 from setuptools import setup
+import os
+from glob import glob
 
 package_name = 'robot_arm_pkg'
 
@@ -8,8 +10,12 @@ setup(
     packages=[package_name],
     data_files=[
         ('share/ament_index/resource_index/packages',
-            ['resource/' + package_name]),
+         ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+
+        # Launch files
+        (os.path.join('share', package_name, 'launch'),
+         glob('launch/*.launch.py')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -28,10 +34,10 @@ setup(
             'ball_node = robot_arm_pkg.ball_node:main',
             'precision_node = robot_arm_pkg.precision_node:main',
 
-
-            # jednorazove console skripty
+            # Jednorazove console skripty
             'set_speed = robot_arm_pkg.set_motor_speed_pub:main',
             'disable_torque = robot_arm_pkg.disable_motor_torque_pub:main'
         ],
     },
 )
+
