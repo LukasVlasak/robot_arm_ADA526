@@ -39,7 +39,7 @@ HOME_SENTINEL = -1.0
 
 # jak dlouho cekat po dojezdu na bod, nez se rameno dokmita [s]
 SETTLE_TIME_HIGH = 4
-SETTLE_TIME_LOW = 0.2
+SETTLE_TIME_LOW = 0.1
 
 # delsi ustaleni na dwell bodu (precision: settle_point_index z Motor goalu) [s]
 DWELL_SETTLE_TIME = 2

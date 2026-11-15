@@ -27,7 +27,7 @@ APPROACH_HEIGHT = 0.05
 PRESS_DEPTH = 0.002
 
 # na kolik mezibodu rozdelit klesani z approach az na tecku (vic = plynulejsi, ale pomalejsi)
-N_DESCENT = 10
+N_DESCENT = 25
 
 # kde v klesani je extra bod s delsim ustalenim: 0.0 = approach, 1.0 = tecka.
 # 0.75 = ve 3/4 klesani. Controller na tenhle bod aplikuje vetsi SETTLE_TIME.
@@ -104,6 +104,8 @@ class PrecisionNode(Node):
             self.__make_point(x, y, z_top),
             # 2) dotyk - pomalu kolmo dolu po mezibodech, zajede pod povrch -> tecka
             *descent_points,
+            # pokus - aby to tam chvili dyl zustalo
+            self.__make_point(x, y, z - PRESS_DEPTH),
             # 3) zvednuti kolmo nahoru od papiru
             self.__make_point(x, y, z_top),
             # 4) navrat do home (sentinel - resi controller)
@@ -113,6 +115,7 @@ class PrecisionNode(Node):
         speeds = [
             SPEED_TRAVEL,
             *([SPEED_TOUCH] * len(descent_points)),
+            SPEED_TOUCH,
             SPEED_LIFT,
             SPEED_HOME,
         ]
