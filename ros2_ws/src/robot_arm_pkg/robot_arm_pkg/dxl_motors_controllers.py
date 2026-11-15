@@ -41,6 +41,9 @@ HOME_SENTINEL = -1.0
 SETTLE_TIME_HIGH = 4
 SETTLE_TIME_LOW = 0.2
 
+# delsi ustaleni na dwell bodu (precision: settle_point_index z Motor goalu) [s]
+DWELL_SETTLE_TIME = 2
+
 # precision potrebuje pero vic kolmo k desce nez micek -> mensi povoleny naklon [deg]
 PRECISION_MAX_TILT_DEG = 10
 
@@ -366,6 +369,7 @@ class DXLMotorsController(Node):
 
     # precision: jako ball, ale po dojezdu na kazdy bod necha rameno SETTLE_TIME ustalit
     async def __run_precision_sequence(self, goal_handle, points, speeds):
+        dwell_idx = goal_handle.request.settle_point_index  # -1 = zadny
         for i, point in enumerate(points):
             if not self.__wait_until_stopped(goal_handle):
                 return False
@@ -375,9 +379,11 @@ class DXLMotorsController(Node):
             if not self.__wait_until_stopped(goal_handle):
                 return False
             # po najeti nad bod, pockat nez se dokmita
-            
+
             if (i == 0):
                 time.sleep(SETTLE_TIME_HIGH)
+            elif (i == dwell_idx):
+                time.sleep(DWELL_SETTLE_TIME)
             else:
                 time.sleep(SETTLE_TIME_LOW)
 

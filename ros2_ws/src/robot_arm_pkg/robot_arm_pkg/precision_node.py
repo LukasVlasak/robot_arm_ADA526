@@ -29,6 +29,10 @@ PRESS_DEPTH = 0.002
 # na kolik mezibodu rozdelit klesani z approach az na tecku (vic = plynulejsi, ale pomalejsi)
 N_DESCENT = 10
 
+# kde v klesani je extra bod s delsim ustalenim: 0.0 = approach, 1.0 = tecka.
+# 0.75 = ve 3/4 klesani. Controller na tenhle bod aplikuje vetsi SETTLE_TIME.
+DWELL_FRACTION = 0.75
+
 # rychlosti pro jednotlive useky trajektorie - jedna hodnota na motor (poradi dle ACTIVE_MOTORS)
 # zatim vsude stejne cislo, uprav si jednotlive motory podle potreby
 # base (motor 1, prvni v poradi) ma -1 -> rychlost se mu NEnastavuje
@@ -81,18 +85,27 @@ class PrecisionNode(Node):
         kalibrace vysky.
         """
 
-        # klesani rozdelene na N_DESCENT mezibodu od approach az pod povrch;
-        # [1:] vynecha approach vysku - ta uz je najeta travel bodem nize
-        descent_z = np.linspace(z + APPROACH_HEIGHT, z - PRESS_DEPTH, N_DESCENT)
-        descent_points = [self.__make_point(x, y, zi) for zi in descent_z[1:]]
+        z_top = z + APPROACH_HEIGHT
+        z_bottom = z - PRESS_DEPTH
+
+        # rovnomerne klesani; [1:] vynecha approach vysku - tu uz najizdi travel bod nize
+        # (z_level, is_dwell) - dwell bod ma v controlleru vetsi SETTLE_TIME
+        levels = [(float(zi), False) for zi in np.linspace(z_top, z_bottom, N_DESCENT)[1:]]
+
+        # extra bod ve DWELL_FRACTION klesani, zaradi se mezi ostatni podle vysky
+        z_dwell = z_top + DWELL_FRACTION * (z_bottom - z_top)
+        levels.append((z_dwell, True))
+        levels.sort(key=lambda lvl: lvl[0], reverse=True)  # klesame -> sestupne
+
+        descent_points = [self.__make_point(x, y, zi) for zi, _ in levels]
 
         points = [
             # 1) bezpecne vysoko primo nad teckou (z home sem)
-            self.__make_point(x, y, z + APPROACH_HEIGHT),
+            self.__make_point(x, y, z_top),
             # 2) dotyk - pomalu kolmo dolu po mezibodech, zajede pod povrch -> tecka
             *descent_points,
             # 3) zvednuti kolmo nahoru od papiru
-            self.__make_point(x, y, z + APPROACH_HEIGHT),
+            self.__make_point(x, y, z_top),
             # 4) navrat do home (sentinel - resi controller)
             self.__make_point(HOME_SENTINEL, HOME_SENTINEL, HOME_SENTINEL),
         ]
@@ -104,9 +117,13 @@ class PrecisionNode(Node):
             SPEED_HOME,
         ]
 
-        return points, speeds
+        # index dwell bodu v celem seznamu points (travel bod je index 0)
+        dwell_local = next(i for i, (_, is_dwell) in enumerate(levels) if is_dwell)
+        settle_point_index = 1 + dwell_local
 
-    async def move_robot(self, points, speeds):
+        return points, speeds, settle_point_index
+
+    async def move_robot(self, points, speeds, settle_point_index=-1):
 
         while not self.motor_client.server_is_ready():
             self.get_logger().info('Waiting for MotorNode...')
@@ -116,6 +133,7 @@ class PrecisionNode(Node):
         goal.points = points
         goal.speeds = [MotorSpeeds(speeds=s) for s in speeds]
         goal.is_ball_action = False  # precision -> po kazdem bodu ustaleni
+        goal.settle_point_index = settle_point_index  # bod s delsim ustalenim (controller)
 
         send_goal_future = self.motor_client.send_goal_async(goal)
 
@@ -153,11 +171,11 @@ class PrecisionNode(Node):
         z = goal_handle.request.z
 
         try:
-            points, speeds = self.generate_trajectory(x, y, z)
+            points, speeds, settle_point_index = self.generate_trajectory(x, y, z)
 
             print(f"Trajetory: [{points}]")
 
-            success = await self.move_robot(points, speeds)
+            success = await self.move_robot(points, speeds, settle_point_index)
 
             if not success:
                 goal_handle.abort()
