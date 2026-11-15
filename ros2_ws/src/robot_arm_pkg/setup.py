@@ -26,6 +26,7 @@ setup(
             'operator = robot_arm_pkg.operator_node:main',
             'ball_transformer_node = robot_arm_pkg.ball_transformer_node:main',
             'ball_node = robot_arm_pkg.ball_node:main',
+            'precision_node = robot_arm_pkg.precision_node:main',
 
 
             # jednorazove console skripty

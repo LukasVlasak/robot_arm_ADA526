@@ -3,11 +3,13 @@ import asyncio
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionServer, ActionClient
-from rclpy.action import GoalResponse, CancelResponse, GoalStatus
+from rclpy.action import GoalResponse, CancelResponse
 
 from robot_interfaces.action import Precision
 from robot_interfaces.action import Motor
 from robot_interfaces.msg import MotorSpeeds
+from action_msgs.msg import GoalStatus
+
 
 from geometry_msgs.msg import Point
 
@@ -20,13 +22,13 @@ from geometry_msgs.msg import Point
 APPROACH_HEIGHT = 0.05
 
 # o kolik zajede POD zadanou vysku papiru [m] - pruzina v pen holderu to pohlti
-PRESS_DEPTH = 0.001
+PRESS_DEPTH = 0.002
 
 # rychlosti pro jednotlive useky trajektorie - jedna hodnota na motor (poradi dle ACTIVE_MOTORS)
 # zatim vsude stejne cislo, uprav si jednotlive motory podle potreby
 # base (motor 1, prvni v poradi) ma -1 -> rychlost se mu NEnastavuje
 SPEED_TRAVEL = [-1.0, 46.0, 46.0, 46.0, 46.0]  # home -> nad tecku (rychle, vysoko nad deskou)
-SPEED_TOUCH = [-1.0, 18.0, 18.0, 18.0, 18.0]   # klesani z approach az na tecku (pomalu, presne)
+SPEED_TOUCH = [-1.0, 16.0, 16.0, 16.0, 16.0]   # klesani z approach az na tecku (pomalu, presne)
 SPEED_LIFT = [-1.0, 40.0, 40.0, 40.0, 40.0]    # zvednuti od papiru
 SPEED_HOME = [-1.0, 46.0, 46.0, 46.0, 46.0]    # navrat do home
 
@@ -142,6 +144,8 @@ class PrecisionNode(Node):
 
         try:
             points, speeds = self.generate_trajectory(x, y, z)
+
+            print(f"Trajetory: [{points}]")
 
             success = await self.move_robot(points, speeds)
 

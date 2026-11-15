@@ -20,11 +20,11 @@ import time
 
 
 HOME_POS_MOTORS = {
-    1: 1250,
-    2: 1250,
-    3: 1250,
-    4: 1250,
-    5: 1250,
+    1: 2109,
+    2: 4845,
+    3: 523,
+    4: 3016,
+    5: 66,
 }
 WEIGHT_POS_MOTORS = {
     1: 1250,
@@ -60,7 +60,7 @@ JOINT4_LIM = [ -92*pi/180, 85*pi/180] # odecetl jsem 5 stupnu v zapornych i v kl
 JOINT5_LIM = [-180*pi/180, 180*pi/180]
 
 # jsem dat primo namerenou hodnotu curr pos motoru kdyz bude sedet s DH modelem
-DH_OFFSETS = [2106, -2073, 8138, 2356, 4]
+DH_OFFSETS = [2109, 6016, -1, 2338, 26]
 DIRECTIONS = [1, -1, -1, -1, 1]
 
 R_FLIP = 0.2 # kdy pero natocito 180 jako vychozi hodnota solveru
@@ -79,7 +79,7 @@ ARROW_UPDATE_EVERY = 20 # update current_q every 10 steps
 # --- kompenzace pruhybu ---
 # realne zmerena poloha hrotu [x, y, z] v metrech v kalibracni poloze CALIB_Q se ZAPNUTYM torque
 # po kazde nove kalibraci zmerit a prepsat; None = kompenzace vypnuta
-CALIB_MEASURED_XYZ = [0.591, 0.0, 0.106]
+CALIB_MEASURED_XYZ = [0.582, 0.0, 0.095]
 CALIB_Q = [0, 0, 0, 0, 0]
 # pruhyb ramene (kloub 2) podle vodorovneho dosahu zapesti [rad/m], z fitu namerenych bodu
 SAG_K2 = -0.051
