@@ -32,7 +32,7 @@ N_DESCENT = 10
 # rychlosti pro jednotlive useky trajektorie - jedna hodnota na motor (poradi dle ACTIVE_MOTORS)
 # zatim vsude stejne cislo, uprav si jednotlive motory podle potreby
 # base (motor 1, prvni v poradi) ma -1 -> rychlost se mu NEnastavuje
-SPEED_TRAVEL = [-1.0, 46.0, 46.0, 46.0, 46.0]  # home -> nad tecku (rychle, vysoko nad deskou)
+SPEED_TRAVEL = [-1.0, 26.0, 26.0, 26.0, 26.0]  # home -> nad tecku (rychle, vysoko nad deskou)
 SPEED_TOUCH = [-1.0, 7.0, 7.0, 20.0, 20.0]   # klesani z approach az na tecku (pomalu, presne)
 SPEED_LIFT = [-1.0, 40.0, 40.0, 40.0, 40.0]    # zvednuti od papiru
 SPEED_HOME = [-1.0, 46.0, 46.0, 46.0, 46.0]    # navrat do home
