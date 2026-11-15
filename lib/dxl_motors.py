@@ -205,10 +205,13 @@ class DXLMotors:
 
         self.profileVelocityWriter.clearParam()
 
-        params = utils.to4bytes([int(s) for s in speeds])
+        speeds = [int(s) for s in speeds]
+        params = utils.to4bytes(speeds)
 
-        for i, dxl_id in enumerate(self.dxl_ids):
-            self.profileVelocityWriter.addParam(dxl_id, params[i])
+        for i in range(len(params)):
+            # -1 znamena preskocit tento motor - rychlost se mu nenastavi
+            if speeds[i] != -1:
+                self.profileVelocityWriter.addParam(self.dxl_ids[i], params[i])
 
         dxl_comm_result = self.profileVelocityWriter.txPacket()
         self.__checkRWResult(dxl_comm_result)
