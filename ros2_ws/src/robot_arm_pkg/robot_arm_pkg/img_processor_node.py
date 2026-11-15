@@ -51,6 +51,9 @@ class ImageProcessor(Node):
         self.fig.add_subplot(2, 2, 3)   # axes[2] = green mask
         self.fig.add_subplot(2, 2, 4)   # axes[3] = red mask
 
+        # polomer micku [mm] - depth je na predni stenu, korekce na stred
+        self.BALL_R = 20.0
+
         self.centroids_green = None
         self.centroids_red = None
         self.depth_green = 5.0
@@ -114,6 +117,12 @@ class ImageProcessor(Node):
             try:
                 point = rs.rs2_deproject_pixel_to_point(
                     self.intrinsics, centroid, depth)
+                # depth je k prednimu POVRCHU micku -> posun bod po paprsku
+                # o polomer na STRED micku (spravi x i y zaroven).
+                # metricke (mm), nezavisle na rozliseni kamery.
+                if depth > 0:
+                    scale = (depth + self.BALL_R) / depth
+                    point = [c * scale for c in point]
                 print(f"{name}:", point)
                 self.publish_point(point, publisher)
             except Exception as e:
