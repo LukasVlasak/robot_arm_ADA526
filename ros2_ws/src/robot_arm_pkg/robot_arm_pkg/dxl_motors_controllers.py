@@ -20,11 +20,11 @@ import time
 
 
 HOME_POS_MOTORS = {
-    1: 2110,
-    2: 4845,
-    3: 523,
-    4: 3016,
-    5: 21,
+    1: 2112,
+    2: -3000,
+    3: 8800,
+    4: 2804,
+    5: 23,
 }
 WEIGHT_POS_MOTORS = {
     1: 1250,
@@ -60,11 +60,11 @@ LINK5_OFFSET = 0.043
 JOINT1_LIM = [-90*pi/180, 90*pi/180]
 JOINT2_LIM = [ -70*pi/180, 70*pi/180] # odecetl jsem 5 stupnu v zapornych i v kladnych kvuli testovani
 JOINT3_LIM = [-90*pi/180, 180*pi/180] # odecetl jsem 5 stupnu v zapornych i v kladnych kvuli testovani
-JOINT4_LIM = [ -92*pi/180, 85*pi/180] # odecetl jsem 5 stupnu v zapornych i v kladnych kvuli testovani
+JOINT4_LIM = [ -47*pi/180, 130*pi/180] # odecetl jsem 5 stupnu v zapornych i v kladnych kvuli testovani
 JOINT5_LIM = [-180*pi/180, 180*pi/180]
 
 # jsem dat primo namerenou hodnotu curr pos motoru kdyz bude sedet s DH modelem
-DH_OFFSETS = [2110, 6067, 41, 2317, 21]
+DH_OFFSETS = [2112, -2046, 8220, 2804, 23]
 DIRECTIONS = [1, -1, -1, -1, 1]
 
 R_FLIP = 0.2 # kdy pero natocito 180 jako vychozi hodnota solveru
@@ -83,7 +83,7 @@ ARROW_UPDATE_EVERY = 20 # update current_q every 10 steps
 # --- kompenzace pruhybu ---
 # realne zmerena poloha hrotu [x, y, z] v metrech v kalibracni poloze CALIB_Q se ZAPNUTYM torque
 # po kazde nove kalibraci zmerit a prepsat; None = kompenzace vypnuta
-CALIB_MEASURED_XYZ = [0.580, 0.0, 0.098]
+CALIB_MEASURED_XYZ = [0.400, -0.001, 0.0035]
 CALIB_Q = [0, 0, 0, 0, 0]
 # pruhyb ramene (kloub 2) podle vodorovneho dosahu zapesti [rad/m], z fitu namerenych bodu
 SAG_K2 = -0.051
@@ -109,8 +109,7 @@ class DXLMotorsController(Node):
         # print(self.robot)
         # print(self.robot.fkine([0,0,0,0,0]))
         # self.robot.plot([0,0,0,0,0], block=True)
-        print(self.robot.fkine([0,0,0,0,0]))
-        print(self.robot.fkine([2100, 2009, 4172, 2330, 16]))
+        # print(self.robot.fkine([0,0,0,0,0]))
 
         self._action_server = ActionServer(
             self,
@@ -248,8 +247,8 @@ class DXLMotorsController(Node):
         r = np.hypot(x, y)
         q5 = pi if r < R_FLIP else 0.0          
 
-        preferred = np.array([0, 0, 0, -45*pi/180, q5])
-        other     = np.array([0, 0, 0, -45*pi/180, pi - q5])
+        preferred = np.array([0, 0, 0, 0, q5])
+        other     = np.array([0, 0, 0, 0, pi - q5])
         return [preferred, other]
 
     def __solve_ik(self, T, x, y, max_tilt_deg):
@@ -300,7 +299,7 @@ class DXLMotorsController(Node):
                     rtb.RevoluteDH(d=LINK1, alpha=pi/2, qlim=JOINT1_LIM), 
                     rtb.RevoluteDH(a=LINK2, qlim=JOINT2_LIM, offset=45*pi/180),
                     rtb.RevoluteDH(a=LINK3, qlim=JOINT3_LIM, offset=-90*pi/180),
-                    rtb.RevoluteDH(a=LINK4_OFFSET, alpha=pi/2, qlim=JOINT4_LIM, offset=90*pi/180), # tady kdyztak a misto d
+                    rtb.RevoluteDH(a=LINK4_OFFSET, alpha=pi/2, qlim=JOINT4_LIM, offset=45*pi/180), # tady kdyztak a misto d
                     rtb.RevoluteDH(d=LINK4, a=LINK5_OFFSET, qlim=JOINT5_LIM), # tady kdyztak a misto d a d misto a 
                 ], name="Robot arm")
         robot.qr = ROBOT_QR
