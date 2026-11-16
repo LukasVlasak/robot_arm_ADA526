@@ -27,7 +27,7 @@ from geometry_msgs.msg import Point, PointStamped
 #   5) HOME
 
 # jak VYSOKO nad vyskou svihu je pripravny bod nad odpalovou pozici [m]
-APPROACH_HEIGHT = 0.1
+APPROACH_HEIGHT = 0.15
 
 # jak daleko za prvnim mickem (proti smeru svihu) je odpalova pozice [m]
 # dost na to, aby rameno pri sjezdu dolu prvni micek jeste netrklo, ale uz na primce
@@ -37,7 +37,7 @@ BACKUP = 0.05
 # rychlosti pro useky - jedna hodnota na motor (poradi dle ACTIVE_MOTORS)
 # 42-45 = pomalu, 46-52 = hodne rychle (viz dxl_motors.setMotorsSpeed)
 SPEED_APPROACH = [40.0, 40.0, 40.0, 40.0, 40.0]  # klidny najezd na pripravne body
-SPEED_STRIKE = [162.0, 190.0, 180.0, 132.0, 132.0]    # BOOM - rychly primy svih pres oba micky
+SPEED_STRIKE = [162.0, 160.0, 160.0, 132.0, 132.0]    # BOOM - rychly primy svih pres oba micky
 SPEED_HOME = [46.0, 46.0, 46.0, 46.0, 46.0]      # navrat do home
 
 # sentinel pro home pozici - controller si pohlida, ze souradnice == -1 a jede do HOME
@@ -130,6 +130,7 @@ class BallNode(Node):
         p_high = prestrike_xy.copy()
         p_high[2] = strike_z + APPROACH_HEIGHT
 
+
         # 1) kolmo dolu na vysku svihu (tady SETTLE)
         p_down = prestrike_xy.copy()
         p_down[2] = strike_z
@@ -144,7 +145,6 @@ class BallNode(Node):
         points = [
             self.__make_point(*p_high),    # 0: klidny najezd vysoko nad odpalovou pozici
             self.__make_point(*p_down),    # 1: kolmo dolu na vysku svihu (tady SETTLE)
-            self.__make_point(*p_first),   # 2: primo prvni micek (rychle)
             self.__make_point(*p_after_first),
             self.__make_point(*p_second),  # 3: primo druhy micek (rychle)
             self.__make_point(HOME_SENTINEL, HOME_SENTINEL, HOME_SENTINEL),  # 4: home
@@ -153,7 +153,6 @@ class BallNode(Node):
         speeds = [
             SPEED_APPROACH,  # 0 najezd vysoko
             SPEED_APPROACH,  # 1 sjezd dolu
-            SPEED_STRIKE,    # 2 prvni micek
             SPEED_STRIKE,    
             SPEED_STRIKE,    # 3 druhy micek
             SPEED_HOME,      # 4 home
