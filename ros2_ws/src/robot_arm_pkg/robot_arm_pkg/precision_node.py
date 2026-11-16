@@ -27,11 +27,11 @@ APPROACH_HEIGHT = 0.05
 PRESS_DEPTH = 0.002
 
 # na kolik mezibodu rozdelit klesani z approach az na tecku (vic = plynulejsi, ale pomalejsi)
-N_DESCENT = 15
+N_DESCENT = 20
 
 # kde v klesani je extra bod s delsim ustalenim: 0.0 = approach, 1.0 = tecka.
 # 0.75 = ve 3/4 klesani. Controller na tenhle bod aplikuje vetsi SETTLE_TIME.
-DWELL_FRACTION = 0.85
+DWELL_FRACTION = 0.9
 
 # rychlosti pro jednotlive useky trajektorie - jedna hodnota na motor (poradi dle ACTIVE_MOTORS)
 # zatim vsude stejne cislo, uprav si jednotlive motory podle potreby

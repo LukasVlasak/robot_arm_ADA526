@@ -159,7 +159,7 @@ class OperatorNode(Node):
         number = int(args[2])
 
         x, y = self.__convert_coordinates(letter, number)
-        z = 0.005
+        z = 0.001
 
         if not self.precision_client.wait_for_server(timeout_sec=5.0):
             print('Precision action server not available')

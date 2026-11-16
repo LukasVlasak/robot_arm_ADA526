@@ -62,7 +62,7 @@ LINK5_OFFSET = 0.043
 
 JOINT1_LIM = [-90*pi/180, 90*pi/180]
 JOINT2_LIM = [ -70*pi/180, 70*pi/180] # odecetl jsem 5 stupnu v zapornych i v kladnych kvuli testovani
-JOINT3_LIM = [-45*pi/180, 180*pi/180] # odecetl jsem 5 stupnu v zapornych i v kladnych kvuli testovani
+JOINT3_LIM = [-50*pi/180, 180*pi/180] # odecetl jsem 5 stupnu v zapornych i v kladnych kvuli testovani
 JOINT4_LIM = [ -92*pi/180, 85*pi/180] # odecetl jsem 5 stupnu v zapornych i v kladnych kvuli testovani
 JOINT5_LIM = [-180*pi/180, 180*pi/180]
 
@@ -92,25 +92,16 @@ CALIB_Q = [0, 0, 0, 0, 0]
 SAG_K2 = -0.051
 
 # --- zbytkova kompenzace pruhybu primo v Z (dolad po vyse uvedene kompenzaci) ---
-# POSTUP MERENI:
-#   1) nech robota v provozu se stavajici kompenzaci (CALIB_* i SAG_K2 jak je ted)
-#   2) najed postupne na kazdy bod (x, 0, SAG_Z_CMD) a zmer SKUTECNE z hrotu [m]
-#   3) namerene z zapis do SAG_Z_SAMPLES misto None, pak restartuj node
-# Z techto bodu se nafituje Dz(r) = a*r + b*r^2 (r = vodorovny dosah) a Dz se pricte
-# k ZADANE z pred IK -> hrot se zvedne presne o chybejici pruhyb. Kvadr. clen zachyti
-# zakriveni, ktere stavajici linearni SAG_K2 model daleko od zakladny nestiha.
-# POZOR: meri se ZBYTKOVA chyba stavajici kompenzace. Kdyz zmenis CALIB_* nebo SAG_K2,
-#        premer znovu. Dokud nejsou aspon 2 zmerene body, Z korekce je vypnuta.
 SAG_Z_CMD = 0.005   # vyska [m], na ktere meris vsechny body (y = 0)
 SAG_Z_SAMPLES = [
     # (x_real [m],  z_skutecne_zmerene [m])   # None = jeste nezmereno
-    (0.550, None),
-    (0.500, None),
-    (0.450, None),
-    (0.400, None),
-    (0.350, None),
-    (0.300, None),
-    (0.250, None),
+    (0.550, 0.004), # 0.004
+    (0.500, 0.004), # 0.004
+    (0.450, 0.004), # 0.004
+    (0.400, 0.003),# 0.003
+    (0.350, 0.003),# 0.003
+    (0.300, 0.002),# 0.002
+    (0.250, 0.001),
 ]
 
 class DXLMotorsController(Node):
