@@ -33,14 +33,11 @@ APPROACH_HEIGHT = 0.1
 # dost na to, aby rameno pri sjezdu dolu prvni micek jeste netrklo, ale uz na primce
 BACKUP = 0.05
 
-# posun vysky svihu vuci stredu micku [m] - zaporne = nize (vic do micku).
-# 0 = svih prochazi stredem micku
-STRIKE_HEIGHT_OFFSET = 0.0
 
 # rychlosti pro useky - jedna hodnota na motor (poradi dle ACTIVE_MOTORS)
 # 42-45 = pomalu, 46-52 = hodne rychle (viz dxl_motors.setMotorsSpeed)
 SPEED_APPROACH = [40.0, 40.0, 40.0, 40.0, 40.0]  # klidny najezd na pripravne body
-SPEED_STRIKE = [72.0, 72.0, 72.0, 72.0, 72.0]    # BOOM - rychly primy svih pres oba micky
+SPEED_STRIKE = [162.0, 190.0, 180.0, 132.0, 132.0]    # BOOM - rychly primy svih pres oba micky
 SPEED_HOME = [46.0, 46.0, 46.0, 46.0, 46.0]      # navrat do home
 
 # sentinel pro home pozici - controller si pohlida, ze souradnice == -1 a jede do HOME
@@ -123,10 +120,11 @@ class BallNode(Node):
         d = d / dist
 
         # vyska svihu - stred prvniho micku +- offset; cely svih je v teto vysce
-        strike_z = f[2] + STRIKE_HEIGHT_OFFSET
+        strike_z = f[2]
 
         # odpalova pozice za prvnim mickem (na primce), x,y spolecne pro bod 0 i 1
         prestrike_xy = f - BACKUP * d
+        after_first_xy = f + BACKUP * d
 
         # 0) vysoko nad odpalovou pozici
         p_high = prestrike_xy.copy()
@@ -136,14 +134,18 @@ class BallNode(Node):
         p_down = prestrike_xy.copy()
         p_down[2] = strike_z
 
+        p_after_first = after_first_xy.copy()
+        p_after_first[2] = strike_z
+
         # 2) primo prvni micek, 3) primo druhy micek - oba ve vysce svihu
         p_first = np.array([f[0], f[1], strike_z])
-        p_second = np.array([s[0], s[1], strike_z])
+        p_second = np.array([s[0], s[1], s[2]])
 
         points = [
             self.__make_point(*p_high),    # 0: klidny najezd vysoko nad odpalovou pozici
             self.__make_point(*p_down),    # 1: kolmo dolu na vysku svihu (tady SETTLE)
             self.__make_point(*p_first),   # 2: primo prvni micek (rychle)
+            self.__make_point(*p_after_first),
             self.__make_point(*p_second),  # 3: primo druhy micek (rychle)
             self.__make_point(HOME_SENTINEL, HOME_SENTINEL, HOME_SENTINEL),  # 4: home
         ]
@@ -152,6 +154,7 @@ class BallNode(Node):
             SPEED_APPROACH,  # 0 najezd vysoko
             SPEED_APPROACH,  # 1 sjezd dolu
             SPEED_STRIKE,    # 2 prvni micek
+            SPEED_STRIKE,    
             SPEED_STRIKE,    # 3 druhy micek
             SPEED_HOME,      # 4 home
         ]

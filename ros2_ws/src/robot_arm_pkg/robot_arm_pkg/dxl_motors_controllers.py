@@ -374,14 +374,14 @@ class DXLMotorsController(Node):
     # --------------------------------------------------
 
     # ceka dokud se motory tocej; vraci False pokud prisel cancel
-    def __wait_until_stopped(self, goal_handle):
+    def __wait_until_stopped(self, goal_handle, move_start_delay = 0.2, time_sleep = 0.1):
         # kratka pauza, aby motory stacily nabehnout a is_moving spolehlive hlasil pohyb
-        time.sleep(MOVE_START_DELAY)
+        time.sleep(move_start_delay)
 
         while self.dxlMotors.getMotorsMoving():
             if goal_handle.is_cancel_requested:
                 return False
-            time.sleep(0.1)
+            time.sleep(time_sleep)
         return True
 
     # nastavi rychlosti (pole - jedna na motor) a jede na jeden bod (karteziansky, nebo HOME sentinel)
@@ -415,7 +415,7 @@ class DXLMotorsController(Node):
         ]
 
         for i, steps in enumerate(moves):
-            if not self.__wait_until_stopped(goal_handle):
+            if not self.__wait_until_stopped(goal_handle, 0.1, 0.05):
                 return False
 
             self.dxlMotors.setMotorsSpeed(speeds[i].speeds)
