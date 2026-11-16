@@ -193,16 +193,19 @@ class DXLMotorsController(Node):
         self.dxlMotors.setSingleMotorProfileAcc(id, acc)
         self.get_logger().info(f"Setting motor {id} acc to: {acc}")
 
-    def coordsToSteps(self, x, y, z, max_tilt_deg=25):
+    def coordsToSteps(self, x, y, z, max_tilt_deg=25, ball=False):
         """
             max_tilt_deg o jak moc muze bejt pero nakloneno k base
             tudiz u precision mene, nebo jak moc jsme schopny aby to bylo aby to jeste udelalo tecku
             u micku nam to je jedno
+
+            ball=True -> IK resi POUZE pozici (maska 1,1,1,0,0,0), orientace pera je
+            jedno, takze pero muze dojet sikmo. Kolme reseni je pro micky kravina.
         """
         z = z + self.__sag_z(x, y)   # zbytkova kompenzace pruhybu v Z (viz SAG_Z_SAMPLES)
-        T = SE3(x, y, z) * SE3.Rx(np.pi)          
+        T = SE3(x, y, z) * SE3.Rx(np.pi)
 
-        q = self.__solve_ik(T, x, y, max_tilt_deg)
+        q = self.__solve_ik(T, x, y, max_tilt_deg, ball)
         if q is None:
             raise ValueError(f"Bod ({x}, {y}, {z}) je mimo dosah")
 
@@ -306,8 +309,17 @@ class DXLMotorsController(Node):
         other     = np.array([0, 0, 0, -45*pi/180, pi - q5])
         return [preferred, other]
 
-    def __solve_ik(self, T, x, y, max_tilt_deg):
+    def __solve_ik(self, T, x, y, max_tilt_deg, ball=False):
         seeds = self.__seeds(x, y)
+
+        # micek: staci dojet na POZICI, orientace (naklon) pera je jedno -> pero
+        # klidne sikmo. Zadne hledani kolmo, zadne omezeni naklonu.
+        if ball:
+            for q0 in seeds:
+                sol = self.robot.ikine_LM(T, q0=q0, mask=[1, 1, 1, 0, 0, 0], joint_limits=True)
+                if sol.success:
+                    return np.array(sol.q)
+            return None
 
         for mask in ([1, 1, 1, 1, 1, 0], [1, 1, 1, 0, 0, 0]):   # nejdriv kolmo, pak fallback
             for q0 in seeds:                                    # nejdriv preferovana vetev
@@ -416,7 +428,7 @@ class DXLMotorsController(Node):
         moves = [
             [HOME_POS_MOTORS[m] for m in ACTIVE_MOTORS]
             if self.__is_home_point(point)
-            else self.coordsToSteps(point.x, point.y, point.z)
+            else self.coordsToSteps(point.x, point.y, point.z, ball=True)
             for point in points
         ]
 
