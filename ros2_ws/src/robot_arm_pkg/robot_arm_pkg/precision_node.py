@@ -20,8 +20,11 @@ from geometry_msgs.msg import Point
 # TRAJECTORY TUNING (menit pri testovani)
 # ==========================================
 
-# vyska bezpecneho bodu primo nad teckou [m] - sem najede z home a odtud klesa kolmo dolu
-APPROACH_HEIGHT = 0.05
+# dve vysky bezpecnych bodu primo nad teckou [m] - z home se najede nejdriv na vyssi
+# (APPROACH_HEIGHT), pak na nizsi (APPROACH_HEIGHT_2), a odtud klesa KOLMO dolu.
+# Klesani i vypocty z_dwell / levels vychazeji z nizsi vysky (APPROACH_HEIGHT_2).
+APPROACH_HEIGHT = 0.15     # prvni (vyssi) priblizeni nad teckou
+APPROACH_HEIGHT_2 = 0.05   # druhe (nizsi) priblizeni - odtud zacina kolme klesani
 
 # o kolik zajede POD zadanou vysku papiru [m] - pruzina v pen holderu to pohlti
 PRESS_DEPTH = 0.002
@@ -85,7 +88,8 @@ class PrecisionNode(Node):
         kalibrace vysky.
         """
 
-        z_top = z + APPROACH_HEIGHT
+        z_high = z + APPROACH_HEIGHT     # prvni (vyssi) priblizeni nad teckou
+        z_top = z + APPROACH_HEIGHT_2    # druhe (nizsi) priblizeni - odtud kolme klesani
         z_bottom = z - PRESS_DEPTH
 
         # rovnomerne klesani; [1:] vynecha approach vysku - tu uz najizdi travel bod nize
@@ -100,29 +104,32 @@ class PrecisionNode(Node):
         descent_points = [self.__make_point(x, y, zi) for zi, _ in levels]
 
         points = [
-            # 1) bezpecne vysoko primo nad teckou (z home sem)
+            # 1) prvni priblizeni - vysoko primo nad teckou (z home sem)
+            self.__make_point(x, y, z_high),
+            # 2) druhe priblizeni - nize nad teckou, odtud zacina kolme klesani
             self.__make_point(x, y, z_top),
-            # 2) dotyk - pomalu kolmo dolu po mezibodech, zajede pod povrch -> tecka
+            # 3) dotyk - pomalu kolmo dolu po mezibodech, zajede pod povrch -> tecka
             *descent_points,
             # # pokus - aby to tam chvili dyl zustalo
             # self.__make_point(x, y, z - PRESS_DEPTH),
-            # 3) zvednuti kolmo nahoru od papiru
+            # 4) zvednuti kolmo nahoru od papiru
             self.__make_point(x, y, z_top),
-            # 4) navrat do home (sentinel - resi controller)
+            # 5) navrat do home (sentinel - resi controller)
             self.__make_point(HOME_SENTINEL, HOME_SENTINEL, HOME_SENTINEL),
         ]
 
         speeds = [
-            SPEED_TRAVEL,
+            SPEED_TRAVEL,   # prvni priblizeni
+            SPEED_TRAVEL,   # druhe priblizeni
             *([SPEED_TOUCH] * len(descent_points)),
             # SPEED_TOUCH,
             SPEED_LIFT,
             SPEED_HOME,
         ]
 
-        # index dwell bodu v celem seznamu points (travel bod je index 0)
+        # index dwell bodu v celem seznamu points (pred descentem jsou 2 approach body)
         dwell_local = next(i for i, (_, is_dwell) in enumerate(levels) if is_dwell)
-        settle_point_index = 1 + dwell_local
+        settle_point_index = 2 + dwell_local
 
         return points, speeds, settle_point_index
 

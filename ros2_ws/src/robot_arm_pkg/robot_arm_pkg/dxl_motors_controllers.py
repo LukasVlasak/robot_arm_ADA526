@@ -38,7 +38,9 @@ WEIGHT_POS_MOTORS = {
 HOME_SENTINEL = -1.0
 
 # jak dlouho cekat po dojezdu na bod, nez se rameno dokmita [s]
-SETTLE_TIME_HIGH = 4
+# precision ma 2 approach vysky nad teckou: prvni (vyssi) a druha (nizsi)
+SETTLE_TIME_APPROACH_1 = 2   # prvni (vyssi) priblizeni
+SETTLE_TIME_APPROACH_2 = 4   # druhe (nizsi) priblizeni
 SETTLE_TIME_LOW = 0.1
 
 # delsi ustaleni na dwell bodu (precision: settle_point_index z Motor goalu) [s]
@@ -441,7 +443,9 @@ class DXLMotorsController(Node):
             # po najeti nad bod, pockat nez se dokmita
 
             if (i == 0):
-                time.sleep(SETTLE_TIME_HIGH)
+                time.sleep(SETTLE_TIME_APPROACH_1)
+            elif (i == 1):
+                time.sleep(SETTLE_TIME_APPROACH_2)
             elif (i == dwell_idx):
                 time.sleep(DWELL_SETTLE_TIME)
             else:
