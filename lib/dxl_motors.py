@@ -21,6 +21,8 @@ class DXLMotors:
         self.extended_position_val       = 4
         self.addr_profile_velocity       = 112  
         self.len_profile_velocity        = 4
+        self.addr_profile_acc            = 108
+        self.len_profile_acc             = 4
         self.port                        = port  # <-- you may need to change the port where the u2d2 is connected
         self.dxl_ids                     = dxl_ids  # [1, 2, 3, 4, 5]
 
@@ -217,6 +219,12 @@ class DXLMotors:
         self.__checkRWResult(dxl_comm_result)
 
         self.profileVelocityWriter.clearParam()
+
+    def setSingleMotorProfileAcc(self, id, acc):
+        self.__checkID(id)
+        
+        dxl_comm_result, dxl_error = self.packetHandler.write4ByteTxRx(self.portHandler, id, self.addr_profile_acc, int(acc))
+        self.__checkRWResult(dxl_comm_result, dxl_error)
 
     def setSingleMotorSpeed(self, id, speed):
         """

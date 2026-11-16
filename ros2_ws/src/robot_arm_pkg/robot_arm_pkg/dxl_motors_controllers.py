@@ -189,6 +189,10 @@ class DXLMotorsController(Node):
         Tq = self.robot.fkine(q)
         return np.degrees(np.arccos(np.clip(-Tq.R[2, 2], -1, 1)))
 
+    def setSingleMotorAcc(self, id, acc):
+        self.dxlMotors.setSingleMotorProfileAcc(id, acc)
+        self.get_logger().info(f"Setting motor {id} acc to: {acc}")
+
     def coordsToSteps(self, x, y, z, max_tilt_deg=25):
         """
             max_tilt_deg o jak moc muze bejt pero nakloneno k base
@@ -406,6 +410,8 @@ class DXLMotorsController(Node):
     # Na odpalovem bodu (settle_point_index) necha rameno ustalit pred rychlym svihem.
     async def __run_ball_sequence(self, goal_handle, points, speeds):
         settle_idx = goal_handle.request.settle_point_index  # -1 = zadny
+        self.setSingleMotorAcc(1, 50)
+        self.setSingleMotorAcc(2, 70)
 
         moves = [
             [HOME_POS_MOTORS[m] for m in ACTIVE_MOTORS]
@@ -426,6 +432,8 @@ class DXLMotorsController(Node):
                 if not self.__wait_until_stopped(goal_handle):
                     return False
                 time.sleep(BALL_SETTLE_TIME)
+
+        self.setSingleMotorAcc(2, 0)
 
         return self.__wait_until_stopped(goal_handle)
 
