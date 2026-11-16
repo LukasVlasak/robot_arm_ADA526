@@ -19,8 +19,8 @@ def generate_launch_description():
         launch_arguments={
             'align_depth.enable': 'true',
             'enable_sync': 'true',
-            'depth_module.profile': '640,480,30',
-            'rgb_camera.profile': '640,480,30',
+            'depth_module.profile': '640,360,30',
+            'rgb_camera.profile': '1280,720,30',
         }.items()
     )
 
@@ -48,9 +48,17 @@ def generate_launch_description():
         output='screen'
     )
 
+    ball_transformer = Node(
+        package='robot_arm_pkg',
+        executable='ball_transformer_node',
+        name='ball_transformer_node',
+        output='screen'
+    )
+
     return LaunchDescription([
         realsense_camera,
         img_processor,
-        camera_tf
+        camera_tf,
+        ball_transformer
     ])
 

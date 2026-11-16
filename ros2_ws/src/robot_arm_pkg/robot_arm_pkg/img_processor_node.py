@@ -63,7 +63,7 @@ class ImageProcessor(Node):
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
-    def find_centroids(self, mask_img, min_area=1000, max_area=60000):
+    def find_centroids(self, mask_img, min_area=1000, max_area=100000):
         try:
             blobs = mask_img.blobs()
             
@@ -186,7 +186,7 @@ class ImageProcessor(Node):
         L = lab.plane(0).image.astype(np.float32)
         a_img = lab.plane(1).image.astype(np.float32)
 
-        thr_a_green = 108 
+        thr_a_green = 105 
         thr_a_red = 150    
         L_ref = 128
         L_min = 20
