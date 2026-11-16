@@ -160,6 +160,7 @@ class BallNode(Node):
         p_high = prestrike_xy.copy()
         p_high[2] = strike_z + APPROACH_HEIGHT
 
+
         # 1) kolmo dolu na vysku svihu (tady SETTLE)
         p_down = prestrike_xy.copy()
         p_down[2] = strike_z
