@@ -186,7 +186,7 @@ class ImageProcessor(Node):
         L = lab.plane(0).image.astype(np.float32)
         a_img = lab.plane(1).image.astype(np.float32)
 
-        thr_a_green = 105 
+        thr_a_green = 108 
         thr_a_red = 150    
         L_ref = 128
         L_min = 20

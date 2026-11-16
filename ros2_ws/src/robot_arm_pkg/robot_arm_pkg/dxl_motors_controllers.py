@@ -423,7 +423,7 @@ class DXLMotorsController(Node):
     async def __run_ball_sequence(self, goal_handle, points, speeds):
         settle_idx = goal_handle.request.settle_point_index  # -1 = zadny
         self.setSingleMotorAcc(1, 50)
-        self.setSingleMotorAcc(2, 70)
+        self.setSingleMotorAcc(2, 120)
 
         moves = [
             [HOME_POS_MOTORS[m] for m in ACTIVE_MOTORS]
