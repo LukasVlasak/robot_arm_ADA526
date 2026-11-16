@@ -1,10 +1,12 @@
-import asyncio
+import time
 
 import numpy as np
 
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionServer, ActionClient, GoalResponse, CancelResponse
+from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.executors import MultiThreadedExecutor
 from action_msgs.msg import GoalStatus
 
 from robot_interfaces.action import Ball
@@ -64,19 +66,26 @@ class BallNode(Node):
         self.green_point = None
         self.red_point = None
 
+        # Reentrant group -> subscribery (green/red) mohou bezet SOUBEZNE s akci,
+        # ktera blokujicne ceka na cerstve pozice (viz __capture_fresh_points).
+        # Nutne spustit uzel na MultiThreadedExecutor (viz main).
+        self.cb_group = ReentrantCallbackGroup()
+
         # Subscribers
         self.sub_green = self.create_subscription(
             PointStamped,
             '/goal_green_base',
             self.green_callback,
-            10
+            10,
+            callback_group=self.cb_group
         )
 
         self.sub_red = self.create_subscription(
             PointStamped,
             '/goal_red_base',
             self.red_callback,
-            10
+            10,
+            callback_group=self.cb_group
         )
 
         # Capture request - rekne transformeru, at zahodi stare vzorky
@@ -95,6 +104,7 @@ class BallNode(Node):
             execute_callback=self.execute_callback,
             goal_callback=self.goal_callback,
             cancel_callback=self.cancel_callback,
+            callback_group=self.cb_group,
         )
 
         self.get_logger().info('Action server started')
@@ -189,9 +199,9 @@ class BallNode(Node):
 
     async def move_robot(self, points, speeds, settle_point_index=-1):
 
-        while not self.motor_client.server_is_ready():
-            self.get_logger().info('Waiting for MotorNode...')
-            await asyncio.sleep(0.1)
+        if not self.motor_client.wait_for_server(timeout_sec=5.0):
+            self.get_logger().error('MotorNode not available')
+            return False
 
         goal = Motor.Goal()
         goal.points = points
@@ -244,12 +254,15 @@ class BallNode(Node):
     # CAPTURE CERSTVYCH POZIC
     # --------------------------------------------------
 
-    async def __capture_fresh_points(self):
+    def __capture_fresh_points(self):
         """
         Zahodi stare pozice, pozada transformer o cerstve vzorky a pocka,
         nez dorazi ustalene pozice OBOU micku. Diky tomu se nikdy nepouzije
         stara pozice z predchozi akce (po presunu micku). Vraci True pri uspechu,
         False pri timeoutu.
+
+        Ceka blokujicne (time.sleep) - green/red callbacky bezi soubezne diky
+        ReentrantCallbackGroup + MultiThreadedExecutor.
         """
         self.green_point = None
         self.red_point = None
@@ -261,7 +274,7 @@ class BallNode(Node):
         while self.green_point is None or self.red_point is None:
             if waited >= CAPTURE_TIMEOUT:
                 return False
-            await asyncio.sleep(CAPTURE_POLL)
+            time.sleep(CAPTURE_POLL)
             waited += CAPTURE_POLL
 
         return True
@@ -288,7 +301,7 @@ class BallNode(Node):
             return result
 
         # cerstve ustalene pozice obou micku z kamery (zahodi stare hodnoty)
-        if not await self.__capture_fresh_points():
+        if not self.__capture_fresh_points():
 
             self.get_logger().error('Timeout - neprisly ustalene pozice micku')
 
@@ -370,8 +383,13 @@ def main(args=None):
 
     node = BallNode()
 
+    # MultiThreadedExecutor -> green/red callbacky bezi soubezne, zatimco akce
+    # blokujicne ceka na cerstve pozice (viz __capture_fresh_points)
+    executor = MultiThreadedExecutor(num_threads=4)
+    executor.add_node(node)
+
     try:
-        rclpy.spin(node)
+        executor.spin()
 
     except KeyboardInterrupt:
         pass
