@@ -31,7 +31,7 @@ N_DESCENT = 15
 
 # kde v klesani je extra bod s delsim ustalenim: 0.0 = approach, 1.0 = tecka.
 # 0.75 = ve 3/4 klesani. Controller na tenhle bod aplikuje vetsi SETTLE_TIME.
-DWELL_FRACTION = 0.9
+DWELL_FRACTION = 0.85
 
 # rychlosti pro jednotlive useky trajektorie - jedna hodnota na motor (poradi dle ACTIVE_MOTORS)
 # zatim vsude stejne cislo, uprav si jednotlive motory podle potreby
