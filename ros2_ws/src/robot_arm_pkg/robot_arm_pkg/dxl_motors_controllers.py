@@ -44,6 +44,9 @@ SETTLE_TIME_LOW = 0.1
 # delsi ustaleni na dwell bodu (precision: settle_point_index z Motor goalu) [s]
 DWELL_SETTLE_TIME = 2
 
+# ustaleni na odpalovem bodu pred rychlym svihem (ball: settle_point_index) [s]
+BALL_SETTLE_TIME = 1.5
+
 # precision potrebuje pero vic kolmo k desce nez micek -> mensi povoleny naklon [deg]
 PRECISION_MAX_TILT_DEG = 10
 
@@ -353,10 +356,16 @@ class DXLMotorsController(Node):
     # --------------------------------------------------
 
     # ball: DULEZITE - spocita vsechnu kinematiku DOPREDU (soutez meri cas pohybu),
-    # pak jede body za sebou a ceka jen na dokonceni pohybu
+    # pak jede body za sebou a ceka jen na dokonceni pohybu.
+    # HOME sentinel se neresi pres IK - jedou se pevne kroky HOME_POS_MOTORS.
+    # Na odpalovem bodu (settle_point_index) necha rameno ustalit pred rychlym svihem.
     async def __run_ball_sequence(self, goal_handle, points, speeds):
+        settle_idx = goal_handle.request.settle_point_index  # -1 = zadny
+
         moves = [
-            self.coordsToSteps(point.x, point.y, point.z)
+            [HOME_POS_MOTORS[m] for m in ACTIVE_MOTORS]
+            if self.__is_home_point(point)
+            else self.coordsToSteps(point.x, point.y, point.z)
             for point in points
         ]
 
@@ -366,6 +375,12 @@ class DXLMotorsController(Node):
 
             self.dxlMotors.setMotorsSpeed(speeds[i].speeds)
             self.makeMove(steps)
+
+            # odpalovy bod pred svihem - nechat rameno ustalit, nez vyrazi BOOM
+            if i == settle_idx:
+                if not self.__wait_until_stopped(goal_handle):
+                    return False
+                time.sleep(BALL_SETTLE_TIME)
 
         return self.__wait_until_stopped(goal_handle)
 
