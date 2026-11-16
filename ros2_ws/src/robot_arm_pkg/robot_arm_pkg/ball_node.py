@@ -148,6 +148,8 @@ class BallNode(Node):
         points = [
             self.__make_point(*p_far_high),    # 0: klidny najezd daleko a vysoko
             self.__make_point(*p_prestrike),   # 1: klidny najezd pred micek (tady SETTLE)
+            first_point,
+            second_point,
             self.__make_point(*p_strike_end),  # 2: BOOM - rychly svih pres oba micky
             self.__make_point(HOME_SENTINEL, HOME_SENTINEL, HOME_SENTINEL),  # 3: home
         ]
@@ -155,6 +157,8 @@ class BallNode(Node):
         speeds = [
             SPEED_APPROACH,  # 0
             SPEED_APPROACH,  # 1
+            SPEED_STRIKE,
+            SPEED_STRIKE,
             SPEED_STRIKE,    # 2 BOOM
             SPEED_HOME,      # 3
         ]

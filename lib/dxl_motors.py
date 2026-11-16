@@ -67,7 +67,7 @@ class DXLMotors:
             (78, 100, 2), # Vel P Gain
             (80, 400, 2), # Pos D Gain
             (82, 500, 2), # Pos I Gain
-            (84, 1200, 2),# Pos P Gain
+            (84, 1000, 2),# Pos P Gain
             (108, 4, 4),  # Prof Acc
             (112, 25, 4), # Prof Vel
         ]
