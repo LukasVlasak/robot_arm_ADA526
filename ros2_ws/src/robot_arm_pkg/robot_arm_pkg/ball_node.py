@@ -12,6 +12,18 @@ from robot_interfaces.action import Motor
 from robot_interfaces.msg import MotorSpeeds
 
 from geometry_msgs.msg import Point, PointStamped
+from std_msgs.msg import Empty
+
+
+# ==========================================
+# CAPTURE (cerstve pozice micku z kamery pred kazdou akci)
+# ==========================================
+
+# jak dlouho cekat, nez transformer posle ustalene pozice OBOU micku [s]
+CAPTURE_TIMEOUT = 15.0
+
+# perioda kontroly, jestli uz cerstve pozice dorazily [s]
+CAPTURE_POLL = 0.1
 
 
 # ==========================================
@@ -27,7 +39,7 @@ from geometry_msgs.msg import Point, PointStamped
 #   5) HOME
 
 # jak VYSOKO nad vyskou svihu je pripravny bod nad odpalovou pozici [m]
-APPROACH_HEIGHT = 0.1
+APPROACH_HEIGHT = 0.15
 
 # jak daleko za prvnim mickem (proti smeru svihu) je odpalova pozice [m]
 # dost na to, aby rameno pri sjezdu dolu prvni micek jeste netrklo, ale uz na primce
@@ -37,7 +49,7 @@ BACKUP = 0.05
 # rychlosti pro useky - jedna hodnota na motor (poradi dle ACTIVE_MOTORS)
 # 42-45 = pomalu, 46-52 = hodne rychle (viz dxl_motors.setMotorsSpeed)
 SPEED_APPROACH = [40.0, 40.0, 40.0, 40.0, 40.0]  # klidny najezd na pripravne body
-SPEED_STRIKE = [162.0, 190.0, 180.0, 132.0, 132.0]    # BOOM - rychly primy svih pres oba micky
+SPEED_STRIKE = [162.0, 160.0, 160.0, 132.0, 132.0]    # BOOM - rychly primy svih pres oba micky
 SPEED_HOME = [46.0, 46.0, 46.0, 46.0, 46.0]      # navrat do home
 
 # sentinel pro home pozici - controller si pohlida, ze souradnice == -1 a jede do HOME
@@ -64,6 +76,14 @@ class BallNode(Node):
             PointStamped,
             '/goal_red_base',
             self.red_callback,
+            10
+        )
+
+        # Capture request - rekne transformeru, at zahodi stare vzorky
+        # a posle cerstve ustalene pozice micku (viz __capture_fresh_points)
+        self.pub_capture = self.create_publisher(
+            Empty,
+            '/ball_capture',
             10
         )
 
@@ -144,7 +164,6 @@ class BallNode(Node):
         points = [
             self.__make_point(*p_high),    # 0: klidny najezd vysoko nad odpalovou pozici
             self.__make_point(*p_down),    # 1: kolmo dolu na vysku svihu (tady SETTLE)
-            self.__make_point(*p_first),   # 2: primo prvni micek (rychle)
             self.__make_point(*p_after_first),
             self.__make_point(*p_second),  # 3: primo druhy micek (rychle)
             self.__make_point(HOME_SENTINEL, HOME_SENTINEL, HOME_SENTINEL),  # 4: home
@@ -154,7 +173,6 @@ class BallNode(Node):
             SPEED_APPROACH,  # 0 najezd vysoko
             SPEED_APPROACH,  # 1 sjezd dolu
             SPEED_STRIKE,    # 2 prvni micek
-            SPEED_STRIKE,    
             SPEED_STRIKE,    # 3 druhy micek
             SPEED_HOME,      # 4 home
         ]
@@ -223,6 +241,32 @@ class BallNode(Node):
         return CancelResponse.ACCEPT
 
     # --------------------------------------------------
+    # CAPTURE CERSTVYCH POZIC
+    # --------------------------------------------------
+
+    async def __capture_fresh_points(self):
+        """
+        Zahodi stare pozice, pozada transformer o cerstve vzorky a pocka,
+        nez dorazi ustalene pozice OBOU micku. Diky tomu se nikdy nepouzije
+        stara pozice z predchozi akce (po presunu micku). Vraci True pri uspechu,
+        False pri timeoutu.
+        """
+        self.green_point = None
+        self.red_point = None
+
+        self.pub_capture.publish(Empty())
+        self.get_logger().info('Capture request poslan, cekam na ustalene pozice...')
+
+        waited = 0.0
+        while self.green_point is None or self.red_point is None:
+            if waited >= CAPTURE_TIMEOUT:
+                return False
+            await asyncio.sleep(CAPTURE_POLL)
+            waited += CAPTURE_POLL
+
+        return True
+
+    # --------------------------------------------------
     # EXECUTE BALL ACTION
     # --------------------------------------------------
 
@@ -232,16 +276,7 @@ class BallNode(Node):
 
         first_ball = goal_handle.request.first_ball
 
-        # Select first and second ball
-        if first_ball == "green":
-            first_point = self.green_point
-            second_point = self.red_point
-
-        elif first_ball == "red":
-            first_point = self.red_point
-            second_point = self.green_point
-
-        else:
+        if first_ball not in ("green", "red"):
             self.get_logger().error('Unknown first_ball value')
 
             goal_handle.abort()
@@ -252,10 +287,10 @@ class BallNode(Node):
 
             return result
 
-        # Check ball positions
-        if first_point is None or second_point is None:
+        # cerstve ustalene pozice obou micku z kamery (zahodi stare hodnoty)
+        if not await self.__capture_fresh_points():
 
-            self.get_logger().error('Waiting for ball positions')
+            self.get_logger().error('Timeout - neprisly ustalene pozice micku')
 
             goal_handle.abort()
 
@@ -264,6 +299,14 @@ class BallNode(Node):
             result.message = 'Ball positions not available'
 
             return result
+
+        # Select first and second ball
+        if first_ball == "green":
+            first_point = self.green_point
+            second_point = self.red_point
+        else:
+            first_point = self.red_point
+            second_point = self.green_point
 
         self.get_logger().info(
             f'First ball position: '
