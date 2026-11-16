@@ -91,6 +91,28 @@ CALIB_Q = [0, 0, 0, 0, 0]
 # pruhyb ramene (kloub 2) podle vodorovneho dosahu zapesti [rad/m], z fitu namerenych bodu
 SAG_K2 = -0.051
 
+# --- zbytkova kompenzace pruhybu primo v Z (dolad po vyse uvedene kompenzaci) ---
+# POSTUP MERENI:
+#   1) nech robota v provozu se stavajici kompenzaci (CALIB_* i SAG_K2 jak je ted)
+#   2) najed postupne na kazdy bod (x, 0, SAG_Z_CMD) a zmer SKUTECNE z hrotu [m]
+#   3) namerene z zapis do SAG_Z_SAMPLES misto None, pak restartuj node
+# Z techto bodu se nafituje Dz(r) = a*r + b*r^2 (r = vodorovny dosah) a Dz se pricte
+# k ZADANE z pred IK -> hrot se zvedne presne o chybejici pruhyb. Kvadr. clen zachyti
+# zakriveni, ktere stavajici linearni SAG_K2 model daleko od zakladny nestiha.
+# POZOR: meri se ZBYTKOVA chyba stavajici kompenzace. Kdyz zmenis CALIB_* nebo SAG_K2,
+#        premer znovu. Dokud nejsou aspon 2 zmerene body, Z korekce je vypnuta.
+SAG_Z_CMD = 0.005   # vyska [m], na ktere meris vsechny body (y = 0)
+SAG_Z_SAMPLES = [
+    # (x_real [m],  z_skutecne_zmerene [m])   # None = jeste nezmereno
+    (0.550, None),
+    (0.500, None),
+    (0.450, None),
+    (0.400, None),
+    (0.350, None),
+    (0.300, None),
+    (0.250, None),
+]
+
 class DXLMotorsController(Node):
     def __init__(self):
         super().__init__("dxl_motors_controllers")
@@ -102,7 +124,8 @@ class DXLMotorsController(Node):
         self.current_q = np.array(self.robot.qr, dtype=float)
         self.arrow_counter = 0
         self.q_bias = self.__compute_joint_bias()
-        
+        self.sag_z_coeffs = self.__compute_sag_z_coeffs()
+
         self.create_subscription(String, 'arrow_user_input', self.arrow_movement, 10)
         self.create_subscription(String, 'set_speed', self.__set_speed_callback, 10)
         self.create_subscription(Empty, 'disable_torque', self.__disable_torque_callback, 10)
@@ -179,6 +202,7 @@ class DXLMotorsController(Node):
             tudiz u precision mene, nebo jak moc jsme schopny aby to bylo aby to jeste udelalo tecku
             u micku nam to je jedno
         """
+        z = z + self.__sag_z(x, y)   # zbytkova kompenzace pruhybu v Z (viz SAG_Z_SAMPLES)
         T = SE3(x, y, z) * SE3.Rx(np.pi)          
 
         q = self.__solve_ik(T, x, y, max_tilt_deg)
@@ -226,6 +250,34 @@ class DXLMotorsController(Node):
         delta = self.q_bias.copy()
         delta[1] += SAG_K2 * (self.__wrist_reach(q) - self.__wrist_reach(CALIB_Q))
         return np.array(q) - delta
+
+    # z namerenych bodu nafituje Dz(r) = a*r + b*r^2 (bez konst. clenu -> u zakladny 0)
+    def __compute_sag_z_coeffs(self):
+        pts = [(x, zm) for (x, zm) in SAG_Z_SAMPLES if zm is not None]
+        if len(pts) < 2:
+            self.get_logger().info(
+                f'SAG_Z: zmereno {len(pts)} bodu (potreba >=2) -> Z korekce vypnuta')
+            return None
+
+        r = np.array([abs(x) for x, _ in pts])            # y=0 pri mereni -> r = |x|
+        sag = np.array([SAG_Z_CMD - zm for _, zm in pts])  # kladne = hrot byl niz nez zadano
+        A = np.vstack([r, r ** 2]).T                       # Dz = a*r + b*r^2
+        coeffs = np.linalg.lstsq(A, sag, rcond=None)[0]
+
+        resid = sag - A @ coeffs
+        self.get_logger().info(
+            f'SAG_Z fit z {len(pts)} bodu: a={coeffs[0]:.4f}, b={coeffs[1]:.4f} | '
+            f'rezidua [mm]: {np.round(resid * 1000, 2)}')
+        return coeffs
+
+    # o kolik [m] zvednout zadanou z v bode (x, y), aby se vyrusil zbytkovy pruhyb
+    def __sag_z(self, x, y):
+        if self.sag_z_coeffs is None:
+            return 0.0
+        r = np.hypot(x, y)
+        a, b = self.sag_z_coeffs
+        dz = float(np.clip(a * r + b * r * r, -0.03, 0.03))  # pojistka proti preklepu v mereni
+        return dz
 
     def goToPos(self, x, y, z): # hlidat max min motoru
         try:
