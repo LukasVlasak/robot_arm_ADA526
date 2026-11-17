@@ -66,10 +66,10 @@ JOINT1_LIM = [-90*pi/180, 90*pi/180]
 JOINT2_LIM = [ -70*pi/180, 70*pi/180] # odecetl jsem 5 stupnu v zapornych i v kladnych kvuli testovani
 JOINT3_LIM = [-50*pi/180, 180*pi/180] # odecetl jsem 5 stupnu v zapornych i v kladnych kvuli testovani
 JOINT4_LIM = [ -92*pi/180, 85*pi/180] # odecetl jsem 5 stupnu v zapornych i v kladnych kvuli testovani
-JOINT5_LIM = [-180*pi/180, 180*pi/180]
+JOINT5_LIM = [-300*pi/180, 300*pi/180]
 
 # jsem dat primo namerenou hodnotu curr pos motoru kdyz bude sedet s DH modelem
-DH_OFFSETS = [2109, -2064, 8167, 2313, 2]
+DH_OFFSETS = [2108, -2070, 8179, 2321, -12]
 DIRECTIONS = [1, -1, -1, -1, 1]
 
 R_FLIP = 0.2 # kdy pero natocito 180 jako vychozi hodnota solveru
@@ -88,7 +88,7 @@ ARROW_UPDATE_EVERY = 20 # update current_q every 10 steps
 # --- kompenzace pruhybu ---
 # realne zmerena poloha hrotu [x, y, z] v metrech v kalibracni poloze CALIB_Q se ZAPNUTYM torque
 # po kazde nove kalibraci zmerit a prepsat; None = kompenzace vypnuta
-CALIB_MEASURED_XYZ = [0.587, 0.0, 0.104]
+CALIB_MEASURED_XYZ = [0.581, 0.0, 0.093]
 CALIB_Q = [0, 0, 0, 0, 0]
 # pruhyb ramene (kloub 2) podle vodorovneho dosahu zapesti [rad/m], z fitu namerenych bodu
 SAG_K2 = -0.051
@@ -307,6 +307,9 @@ class DXLMotorsController(Node):
 
         preferred = np.array([0, 0, 0, -45*pi/180, q5])
         other     = np.array([0, 0, 0, -45*pi/180, pi - q5])
+
+        print(self.robot.fkine(preferred))
+        self.robot.plot(preferred)
         return [preferred, other]
 
     def __solve_ik(self, T, x, y, max_tilt_deg, ball=False):
