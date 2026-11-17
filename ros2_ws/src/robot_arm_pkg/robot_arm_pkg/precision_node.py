@@ -27,7 +27,7 @@ APPROACH_HEIGHT = 0.15     # prvni (vyssi) priblizeni nad teckou
 APPROACH_HEIGHT_2 = 0.05   # druhe (nizsi) priblizeni - odtud zacina kolme klesani
 
 # o kolik zajede POD zadanou vysku papiru [m] - pruzina v pen holderu to pohlti
-PRESS_DEPTH = 0.002
+PRESS_DEPTH = 0.003
 
 # na kolik mezibodu rozdelit klesani z approach az na tecku (vic = plynulejsi, ale pomalejsi)
 N_DESCENT = 20
@@ -39,8 +39,8 @@ DWELL_FRACTION = 0.9
 # rychlosti pro jednotlive useky trajektorie - jedna hodnota na motor (poradi dle ACTIVE_MOTORS)
 # zatim vsude stejne cislo, uprav si jednotlive motory podle potreby
 # base (motor 1, prvni v poradi) ma -1 -> rychlost se mu NEnastavuje
-SPEED_TRAVEL = [-1.0, 26.0, 26.0, 26.0, 26.0]  # home -> nad tecku (rychle, vysoko nad deskou)
-SPEED_TOUCH = [-1.0, 7.0, 7.0, 20.0, 20.0]   # klesani z approach az na tecku (pomalu, presne)
+SPEED_TRAVEL = [-1.0, 26.0, 26.0, 26.0, 60.0]  # home -> nad tecku (rychle, vysoko nad deskou)
+SPEED_TOUCH = [-1.0, 7.0, 7.0, 20.0, 65.0]   # klesani z approach az na tecku (pomalu, presne)
 SPEED_LIFT = [-1.0, 40.0, 40.0, 40.0, 40.0]    # zvednuti od papiru
 SPEED_HOME = [-1.0, 46.0, 46.0, 46.0, 46.0]    # navrat do home
 

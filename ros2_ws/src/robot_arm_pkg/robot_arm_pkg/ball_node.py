@@ -51,7 +51,7 @@ BACKUP = 0.05
 # rychlosti pro useky - jedna hodnota na motor (poradi dle ACTIVE_MOTORS)
 # 42-45 = pomalu, 46-52 = hodne rychle (viz dxl_motors.setMotorsSpeed)
 SPEED_APPROACH = [40.0, 40.0, 40.0, 40.0, 40.0]  # klidny najezd na pripravne body
-SPEED_STRIKE = [162.0, 220.0, 160.0, 132.0, 132.0]    # BOOM - rychly primy svih pres oba micky
+SPEED_STRIKE = [162.0, 350.0, 220.0, 132.0, 132.0]    # BOOM - rychly primy svih pres oba micky
 SPEED_HOME = [46.0, 46.0, 46.0, 46.0, 46.0]      # navrat do home
 
 # sentinel pro home pozici - controller si pohlida, ze souradnice == -1 a jede do HOME

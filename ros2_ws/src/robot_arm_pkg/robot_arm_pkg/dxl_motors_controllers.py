@@ -19,13 +19,16 @@ import time
 # TODO: self.current_q SE TED NEUPDATUJE - ZATIM NEPOUZIVAM TAKZE OK 
 
 
+# k 12 0.15
 HOME_POS_MOTORS = {
-    1: 2109,
-    2: -3240,
-    3: 9019,
-    4: 2828,
-    5: 2,
+    1: 2112,
+    2: 142,
+    3: 5104,
+    4: 2903,
+    5: 12,
 }
+
+# k 5 0.2
 WEIGHT_POS_MOTORS = {
     1: 1250,
     2: 1250,
@@ -69,7 +72,7 @@ JOINT4_LIM = [ -92*pi/180, 85*pi/180] # odecetl jsem 5 stupnu v zapornych i v kl
 JOINT5_LIM = [-200*pi/180, 200*pi/180]
 
 # jsem dat primo namerenou hodnotu curr pos motoru kdyz bude sedet s DH modelem
-DH_OFFSETS = [2108, -2070, 8179, 2321, -12]
+DH_OFFSETS = [2106, 2004, 4019, 2285, 12]
 DIRECTIONS = [1, -1, -1, -1, 1]
 
 ROBOT_QR = [0, 0, 0, 0, 0]
@@ -86,7 +89,7 @@ ARROW_UPDATE_EVERY = 20 # update current_q every 10 steps
 # --- kompenzace pruhybu ---
 # realne zmerena poloha hrotu [x, y, z] v metrech v kalibracni poloze CALIB_Q se ZAPNUTYM torque
 # po kazde nove kalibraci zmerit a prepsat; None = kompenzace vypnuta
-CALIB_MEASURED_XYZ = [0.581, 0.0, 0.093]
+CALIB_MEASURED_XYZ = [0.588, 0.0, 0.106]
 CALIB_Q = [0, 0, 0, 0, 0]
 # pruhyb ramene (kloub 2) podle vodorovneho dosahu zapesti [rad/m], z fitu namerenych bodu
 SAG_K2 = -0.051
@@ -101,41 +104,41 @@ ERR_CMD_Z = 0.005   # vyska [m], na ktere meris vsechny body
 ERR_SAMPLES = [
     # ((x_zadane, y_zadane) [m],  [x_mer, y_mer, z_mer] [m] | None)
     # --- x = 0.575 ---
-    ((0.575,  0.000), None),
-    ((0.575,  0.125), None),
-    ((0.575,  0.225), None),
-    ((0.575, -0.125), None),
-    ((0.575, -0.225), None),
+    ((0.575,  0.000), [0.579,-0.002,-0.004]),
+    ((0.575,  0.125), [0.579, 0.128, -0.005]),
+    ((0.575,  0.225), [0.582, 0.228, -0.006]),
+    ((0.575, -0.125), [0.582, -0.136, 0.000]),
+    ((0.575, -0.225), [0.583, -0.229, -0.005]),
     # --- x = 0.500 ---
-    ((0.500,  0.000), None),
-    ((0.500,  0.125), None),
-    ((0.500,  0.225), None),
-    ((0.500, -0.125), None),
-    ((0.500, -0.225), None),
+    ((0.500,  0.000), [0.503, -0.003, -0.004]),
+    ((0.500,  0.125), [0.503, 0.125, -0.003]),
+    ((0.500,  0.225), [0.502, 0.227, -0.004]),
+    ((0.500, -0.125), [0.503, -0.130, -0.003]),
+    ((0.500, -0.225), [0.501, -0.231, -0.003]),
     # --- x = 0.425 ---
-    ((0.425,  0.000), None),
-    ((0.425,  0.125), None),
-    ((0.425,  0.225), None),
-    ((0.425, -0.125), None),
-    ((0.425, -0.225), None),
+    ((0.425,  0.000), [0.426, -0.001, -0.001]),
+    ((0.425,  0.125), [0.429, 0.121, -0.001]),
+    ((0.425,  0.225), [0.428, 0.224, -0.002]),
+    ((0.425, -0.125), [0.426, -0.124, -0.002]),
+    ((0.425, -0.225), [0.427, -0.223, -0.003]),
     # --- x = 0.350 ---
-    ((0.350,  0.000), None),
-    ((0.350,  0.125), None),
-    ((0.350,  0.225), None),
-    ((0.350, -0.125), None),
-    ((0.350, -0.225), None),
+    ((0.350,  0.000), [0.351, -0.002, 0.003]),
+    ((0.350,  0.125), [0.352, 0.123, 0.002]),
+    ((0.350,  0.225), [0.352, 0.224, 0.000]),
+    ((0.350, -0.125), [0.350, -0.128, 0.002]),
+    ((0.350, -0.225), [0.351, -0.224, -0.001]),
     # --- x = 0.275 ---
-    ((0.275,  0.000), None),
-    ((0.275,  0.125), None),
-    ((0.275,  0.225), None),
-    ((0.275, -0.125), None),
-    ((0.275, -0.225), None),
+    ((0.275,  0.000), [0.272, -0.004, 0.001]),
+    ((0.275,  0.125), [0.278, 0.124, 0.004]),
+    ((0.275,  0.225), [0.277, 0.224, 0.002]),
+    ((0.275, -0.125), [0.276, -0.128, 0.004]),
+    ((0.275, -0.225), [0.276, -0.225, 0.002]),
     # --- x = 0.200 ---
-    ((0.200,  0.000), None),
-    ((0.200,  0.125), None),
-    ((0.200,  0.225), None),
-    ((0.200, -0.125), None),
-    ((0.200, -0.225), None),
+    ((0.200,  0.000), [0.200, -0.003, 0.002]),
+    ((0.200,  0.125), [0.200, 0.122, 0.002]),
+    ((0.200,  0.225), [0.201, 0.222, 0.000]),
+    ((0.200, -0.125), [0.197, -0.127, 0.002]),
+    ((0.200, -0.225), [0.195, -0.225, 0.000]),
 ]
 
 # bazove funkce fitu chyby: bivariatni polynom v (x, y) do 2. stupne.
@@ -492,8 +495,12 @@ class DXLMotorsController(Node):
         ]
 
         for i, steps in enumerate(moves):
-            if not self.__wait_until_stopped(goal_handle, 0.1, 0.05):
-                return False
+            if i != 4:
+                if not self.__wait_until_stopped(goal_handle, 0.1, 0.05):
+                    return False
+            else:
+                if not self.__wait_until_stopped(goal_handle):
+                    return False
 
             self.dxlMotors.setMotorsSpeed(speeds[i].speeds)
             self.makeMove(steps)
