@@ -147,6 +147,9 @@ ERR_SAMPLES = [
 def _err_basis(x, y):
     return np.array([1.0, x, y, x * x, x * y, y * y])
 
+MOTOR_STATUS_PERIOD = 1.0   # jak casto [s] publikovat teplotu a proud motoru
+
+
 class DXLMotorsController(Node):
     def __init__(self):
         super().__init__("dxl_motors_controllers")
@@ -179,6 +182,42 @@ class DXLMotorsController(Node):
             goal_callback=self.goal_callback,
             cancel_callback=self.cancel_callback,
         )
+
+        # --- monitor teploty a proudu motoru (pro zavesovani zavazi) ---
+        # ODKOMENTUJ tenhle blok, aby se zacalo publikovat na /motor_status:
+        # self.motor_status_pub = self.create_publisher(String, 'motor_status', 10)
+        # try:
+        #     self.current_limits = self.dxlMotors.getMotorsCurrentLimit(ACTIVE_MOTORS)
+        # except Exception as e:
+        #     self.current_limits = {}
+        #     self.get_logger().warn(f'Nelze precist current limity motoru: {e}')
+        # self.create_timer(MOTOR_STATUS_PERIOD, self.__publish_motor_status)
+
+    # precte teplotu + proud vsech motoru najednou a publikuje je na /motor_status.
+    # % = |present_current| / current_limit -> jak blizko je motor svemu max momentu.
+    #
+    # Zobrazeni v konzoli:   ros2 topic echo /motor_status --field data
+    def __publish_motor_status(self):
+        try:
+            temps = self.dxlMotors.getMotorsTemperature(ACTIVE_MOTORS)
+            currs = self.dxlMotors.getMotorsCurrent(ACTIVE_MOTORS)
+        except Exception as e:
+            self.get_logger().warn(f'Cteni stavu motoru selhalo: {e}')
+            return
+
+        parts = []
+        for id in ACTIVE_MOTORS:
+            t = temps.get(id)
+            c = currs.get(id)
+            lim = self.current_limits.get(id)
+            if lim:
+                parts.append(f'M{id} T={t}C I={c}/{lim} ({abs(c) / lim * 100:.0f}%)')
+            else:
+                parts.append(f'M{id} T={t}C I={c}')
+
+        msg = String()
+        msg.data = ' | '.join(parts)
+        self.motor_status_pub.publish(msg)
 
     def calibrateBase(self):
         self.dxlMotors.calibrateBase()

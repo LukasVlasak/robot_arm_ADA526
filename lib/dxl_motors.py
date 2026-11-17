@@ -23,6 +23,12 @@ class DXLMotors:
         self.len_profile_velocity        = 4
         self.addr_profile_acc            = 108
         self.len_profile_acc             = 4
+        self.addr_present_current        = 126       # 2 byte, signed (uměra k točivému momentu)
+        self.len_present_current         = 2
+        self.addr_present_temperature    = 146       # 1 byte, °C
+        self.len_present_temperature     = 1
+        self.addr_current_limit          = 38        # 2 byte, EEPROM (max proud = ~stall)
+        self.len_current_limit           = 2
         self.port                        = port  # <-- you may need to change the port where the u2d2 is connected
         self.dxl_ids                     = dxl_ids  # [1, 2, 3, 4, 5]
 
@@ -43,6 +49,9 @@ class DXLMotors:
         self.profileVelocityWriter = dxl.GroupSyncWrite(self.portHandler, self.packetHandler, self.addr_profile_velocity, self.len_profile_velocity)
         self.operatingModeWriter = dxl.GroupSyncWrite(self.portHandler, self.packetHandler, self.addr_operating_mode, 1)
         self.isMovingReader = dxl.GroupSyncRead(self.portHandler, self.packetHandler, self.addr_is_moving, 1)
+        self.presentCurrentReader = dxl.GroupSyncRead(self.portHandler, self.packetHandler, self.addr_present_current, self.len_present_current)
+        self.presentTemperatureReader = dxl.GroupSyncRead(self.portHandler, self.packetHandler, self.addr_present_temperature, self.len_present_temperature)
+        self.currentLimitReader = dxl.GroupSyncRead(self.portHandler, self.packetHandler, self.addr_current_limit, self.len_current_limit)
 
         # initial settings
         self.__setExtendedOperatingMode()
@@ -172,6 +181,41 @@ class DXLMotors:
             result.append(self.__toSigned32(pos))
 
         return result
+
+    # --- group read helper: precte jeden registr ze vsech motoru najednou ---
+    def __groupRead(self, reader, addr, length, ids):
+        if ids is None:
+            ids = self.dxl_ids
+
+        reader.clearParam()
+        for id in ids:
+            reader.addParam(id)
+
+        dxl_comm_result = reader.txRxPacket()
+        self.__checkRWResult(dxl_comm_result)
+
+        out = {}
+        for id in ids:
+            if not reader.isAvailable(id, addr, length):
+                raise RuntimeError("Data for group reading not available")
+            out[id] = reader.getData(id, addr, length)
+        return out
+
+    # Present Temperature [°C] pro vsechny motory -> {id: temp}
+    def getMotorsTemperature(self, ids=None):
+        return self.__groupRead(self.presentTemperatureReader,
+                                 self.addr_present_temperature, self.len_present_temperature, ids)
+
+    # Present Current (signed) pro vsechny motory -> {id: current}
+    def getMotorsCurrent(self, ids=None):
+        raw = self.__groupRead(self.presentCurrentReader,
+                               self.addr_present_current, self.len_present_current, ids)
+        return {id: (v - (1 << 16) if v >= (1 << 15) else v) for id, v in raw.items()}
+
+    # Current Limit (EEPROM) pro vsechny motory -> {id: limit}
+    def getMotorsCurrentLimit(self, ids=None):
+        return self.__groupRead(self.currentLimitReader,
+                                self.addr_current_limit, self.len_current_limit, ids)
 
     def setMotorsGoalPos(self, pos):
         """
