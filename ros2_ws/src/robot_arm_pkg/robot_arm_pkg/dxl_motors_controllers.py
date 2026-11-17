@@ -72,7 +72,15 @@ JOINT5_LIM = [-180*pi/180, 180*pi/180]
 DH_OFFSETS = [2109, -2064, 8167, 2313, 2]
 DIRECTIONS = [1, -1, -1, -1, 1]
 
-R_FLIP = 0.2 # kdy pero natocito 180 jako vychozi hodnota solveru
+R_FLIP = 0.25 # pod timto dosahem [m] se vynuti flip kloubu 5 (43mm plato k base -> dosahneme bliz)
+
+# flipnute pulky kloubu 5: q5 kolem +-180 misto kolem 0. V zone r < R_FLIP
+# donutime solver najit reseni v jedne z techto pulek (qlim se docasne omezi),
+# cimz se 43mm plato s perem prehodi smerem k base. Zkousi se obe pulky.
+FLIP_HALVES = [
+    ( 90*pi/180,  180*pi/180),   # kladna flipnuta pulka
+    (-180*pi/180, -90*pi/180),   # zaporna flipnuta pulka
+]
 
 ROBOT_QR = [0, 0, 0, 0, 0]
 
@@ -301,16 +309,13 @@ class DXLMotorsController(Node):
         if msg.command == 'move':
             self.goToPos(msg.x, msg.y, msg.z)
 
-    def __seeds(self, x, y):
-        r = np.hypot(x, y)
-        q5 = pi if r < R_FLIP else 0.0          
+    # startovaci konfigurace ramene (q1-q4); q5 doplni __solve_ik podle flip zony
+    def __arm_seeds(self):
+        return [np.array([0, 0, 0, -45*pi/180])]
 
-        preferred = np.array([0, 0, 0, -45*pi/180, q5])
-        other     = np.array([0, 0, 0, -45*pi/180, pi - q5])
-        return [preferred, other]
-
-    def __solve_ik(self, T, x, y, max_tilt_deg, ball=False):
-        seeds = self.__seeds(x, y)
+    # jeden pokus o IK s danym seedem kloubu 5 (q5_seed); vraci q nebo None
+    def __ik_once(self, T, q5_seed, max_tilt_deg, ball):
+        seeds = [np.append(arm, q5_seed) for arm in self.__arm_seeds()]
 
         # micek: staci dojet na POZICI, orientace (naklon) pera je jedno -> pero
         # klidne sikmo. Zadne hledani kolmo, zadne omezeni naklonu.
@@ -322,11 +327,31 @@ class DXLMotorsController(Node):
             return None
 
         for mask in ([1, 1, 1, 1, 1, 0], [1, 1, 1, 0, 0, 0]):   # nejdriv kolmo, pak fallback
-            for q0 in seeds:                                    # nejdriv preferovana vetev
+            for q0 in seeds:
                 sol = self.robot.ikine_LM(T, q0=q0, mask=mask, joint_limits=True)
                 if sol.success and self.__pen_tilt(sol.q) <= max_tilt_deg:
                     return np.array(sol.q)
         return None
+
+    def __solve_ik(self, T, x, y, max_tilt_deg, ball=False):
+        r = np.hypot(x, y)
+
+        # blizko base: vynutit flip kloubu 5 -> docasne omezit jeho qlim na flipnutou
+        # pulku, seed doprostred (ne na hranici), zkusit obe pulky a vzit prvni uspech
+        if r < R_FLIP:
+            q5_lim_orig = self.robot.links[4].qlim
+            try:
+                for lo, hi in FLIP_HALVES:
+                    self.robot.links[4].qlim = np.array([lo, hi])
+                    q = self.__ik_once(T, (lo + hi) / 2, max_tilt_deg, ball)
+                    if q is not None:
+                        return q
+            finally:
+                self.robot.links[4].qlim = q5_lim_orig
+            return None
+
+        # dal od base: kloub 5 kolem 0, plny rozsah (puvodni chovani)
+        return self.__ik_once(T, 0.0, max_tilt_deg, ball)
 
 
     # pro cli set_speed
