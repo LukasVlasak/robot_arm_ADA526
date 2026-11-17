@@ -66,7 +66,7 @@ JOINT1_LIM = [-90*pi/180, 90*pi/180]
 JOINT2_LIM = [ -70*pi/180, 70*pi/180] # odecetl jsem 5 stupnu v zapornych i v kladnych kvuli testovani
 JOINT3_LIM = [-50*pi/180, 180*pi/180] # odecetl jsem 5 stupnu v zapornych i v kladnych kvuli testovani
 JOINT4_LIM = [ -92*pi/180, 85*pi/180] # odecetl jsem 5 stupnu v zapornych i v kladnych kvuli testovani
-JOINT5_LIM = [-300*pi/180, 300*pi/180]
+JOINT5_LIM = [-200*pi/180, 200*pi/180]
 
 # jsem dat primo namerenou hodnotu curr pos motoru kdyz bude sedet s DH modelem
 DH_OFFSETS = [2108, -2070, 8179, 2321, -12]
@@ -76,7 +76,7 @@ ROBOT_QR = [0, 0, 0, 0, 0]
 
 ACTIVE_MOTORS = [1, 2, 3, 4, 5]
 
-TESTING_MOTORS_SPEED = 250
+TESTING_MOTORS_SPEED = 50
 
 GEAR = np.array([1, 4, 3, 1, 1]) # kdyz nebude fungovat tak toto upravit 
 
