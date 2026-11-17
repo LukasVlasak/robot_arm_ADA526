@@ -91,18 +91,58 @@ CALIB_Q = [0, 0, 0, 0, 0]
 # pruhyb ramene (kloub 2) podle vodorovneho dosahu zapesti [rad/m], z fitu namerenych bodu
 SAG_K2 = -0.051
 
-# --- zbytkova kompenzace pruhybu primo v Z (dolad po vyse uvedene kompenzaci) ---
-SAG_Z_CMD = 0.005   # vyska [m], na ktere meris vsechny body (y = 0)
-SAG_Z_SAMPLES = [
-    # (x_real [m],  z_skutecne_zmerene [m])   # None = jeste nezmereno
-    (0.550, 0.004), # 0.004
-    (0.500, 0.004), # 0.004
-    (0.450, 0.004), # 0.004
-    (0.400, 0.003),# 0.003
-    (0.350, 0.003),# 0.003
-    (0.300, 0.002),# 0.002
-    (0.250, 0.001),
+# --- zbytkova kompenzace chyby hrotu ve VSECH osach (dolad po vyse uvedene kompenzaci) ---
+# Mrizka mereni: pro kazdy ZADANY bod (x, y) [m] (z se zadava vzdy ERR_CMD_Z)
+# zmer skutecnou polohu hrotu [x, y, z] [m]. None = jeste nezmereno.
+# Z techto bodu se nafituje korekce (zadane - zmerene) v kazde ose a pricte se
+# k zadanemu bodu pred IK, cimz se chyba vyrusi (viz __compute_err_coeffs / __err_comp).
+ERR_CMD_Z = 0.005   # vyska [m], na ktere meris vsechny body
+
+ERR_SAMPLES = [
+    # ((x_zadane, y_zadane) [m],  [x_mer, y_mer, z_mer] [m] | None)
+    # --- x = 0.575 ---
+    ((0.575,  0.000), None),
+    ((0.575,  0.125), None),
+    ((0.575,  0.225), None),
+    ((0.575, -0.125), None),
+    ((0.575, -0.225), None),
+    # --- x = 0.500 ---
+    ((0.500,  0.000), None),
+    ((0.500,  0.125), None),
+    ((0.500,  0.225), None),
+    ((0.500, -0.125), None),
+    ((0.500, -0.225), None),
+    # --- x = 0.425 ---
+    ((0.425,  0.000), None),
+    ((0.425,  0.125), None),
+    ((0.425,  0.225), None),
+    ((0.425, -0.125), None),
+    ((0.425, -0.225), None),
+    # --- x = 0.350 ---
+    ((0.350,  0.000), None),
+    ((0.350,  0.125), None),
+    ((0.350,  0.225), None),
+    ((0.350, -0.125), None),
+    ((0.350, -0.225), None),
+    # --- x = 0.275 ---
+    ((0.275,  0.000), None),
+    ((0.275,  0.125), None),
+    ((0.275,  0.225), None),
+    ((0.275, -0.125), None),
+    ((0.275, -0.225), None),
+    # --- x = 0.200 ---
+    ((0.200,  0.000), None),
+    ((0.200,  0.125), None),
+    ((0.200,  0.225), None),
+    ((0.200, -0.125), None),
+    ((0.200, -0.225), None),
 ]
+
+# bazove funkce fitu chyby: bivariatni polynom v (x, y) do 2. stupne.
+# Pro presnejsi fit sem lze pridat dalsi cleny (napr. x*x*y, x*y*y, ...),
+# jen musi byt zmerenych bodu aspon tolik, kolik je clenu.
+def _err_basis(x, y):
+    return np.array([1.0, x, y, x * x, x * y, y * y])
 
 class DXLMotorsController(Node):
     def __init__(self):
@@ -115,7 +155,7 @@ class DXLMotorsController(Node):
         self.current_q = np.array(self.robot.qr, dtype=float)
         self.arrow_counter = 0
         self.q_bias = self.__compute_joint_bias()
-        self.sag_z_coeffs = self.__compute_sag_z_coeffs()
+        self.err_coeffs = self.__compute_err_coeffs()
 
         self.create_subscription(String, 'arrow_user_input', self.arrow_movement, 10)
         self.create_subscription(String, 'set_speed', self.__set_speed_callback, 10)
@@ -200,7 +240,8 @@ class DXLMotorsController(Node):
             ball=True -> IK resi POUZE pozici (maska 1,1,1,0,0,0), orientace pera je
             jedno, takze pero muze dojet sikmo. Kolme reseni je pro micky kravina.
         """
-        z = z + self.__sag_z(x, y)   # zbytkova kompenzace pruhybu v Z (viz SAG_Z_SAMPLES)
+        dx, dy, dz = self.__err_comp(x, y)   # kompenzace zmerene chyby hrotu ve vsech osach
+        x, y, z = x + dx, y + dy, z + dz
 
         q = self.__solve_ik(x, y, z, max_tilt_deg, ball)
         if q is None:
@@ -248,33 +289,36 @@ class DXLMotorsController(Node):
         delta[1] += SAG_K2 * (self.__wrist_reach(q) - self.__wrist_reach(CALIB_Q))
         return np.array(q) - delta
 
-    # z namerenych bodu nafituje Dz(r) = a*r + b*r^2 (bez konst. clenu -> u zakladny 0)
-    def __compute_sag_z_coeffs(self):
-        pts = [(x, zm) for (x, zm) in SAG_Z_SAMPLES if zm is not None]
-        if len(pts) < 2:
+    # z namerenych bodu (ERR_SAMPLES) nafituje korekci (zadane - zmerene) ve vsech 3 osach
+    # jako bivariatni polynom v (x, y). Vraci matici koeficientu (n_bazi, 3) nebo None.
+    def __compute_err_coeffs(self):
+        pts = [((xc, yc), m) for (xc, yc), m in ERR_SAMPLES if m is not None]
+        n_basis = len(_err_basis(0.0, 0.0))
+        if len(pts) < n_basis:
             self.get_logger().info(
-                f'SAG_Z: zmereno {len(pts)} bodu (potreba >=2) -> Z korekce vypnuta')
+                f'ERR: zmereno {len(pts)} bodu (potreba >={n_basis}) -> XYZ korekce vypnuta')
             return None
 
-        r = np.array([abs(x) for x, _ in pts])            # y=0 pri mereni -> r = |x|
-        sag = np.array([SAG_Z_CMD - zm for _, zm in pts])  # kladne = hrot byl niz nez zadano
-        A = np.vstack([r, r ** 2]).T                       # Dz = a*r + b*r^2
-        coeffs = np.linalg.lstsq(A, sag, rcond=None)[0]
+        A = np.array([_err_basis(xc, yc) for (xc, yc), _ in pts])              # (n, n_bazi)
+        # korekce = zadane - zmerene (pricte se k zadanemu bodu pred IK)
+        B = np.array([[xc - m[0], yc - m[1], ERR_CMD_Z - m[2]]
+                      for (xc, yc), m in pts])                                 # (n, 3)
+        coeffs = np.linalg.lstsq(A, B, rcond=None)[0]                          # (n_bazi, 3)
 
-        resid = sag - A @ coeffs
+        rms_raw = np.sqrt(np.mean(B ** 2, axis=0)) * 1000                      # chyba pred fitem
+        rms_res = np.sqrt(np.mean((B - A @ coeffs) ** 2, axis=0)) * 1000       # rezidua po fitu
         self.get_logger().info(
-            f'SAG_Z fit z {len(pts)} bodu: a={coeffs[0]:.4f}, b={coeffs[1]:.4f} | '
-            f'rezidua [mm]: {np.round(resid * 1000, 2)}')
+            f'ERR fit z {len(pts)} bodu | RMS chyby [mm] x/y/z: {np.round(rms_raw, 2)} '
+            f'-> rezidua [mm]: {np.round(rms_res, 2)}')
         return coeffs
 
-    # o kolik [m] zvednout zadanou z v bode (x, y), aby se vyrusil zbytkovy pruhyb
-    def __sag_z(self, x, y):
-        if self.sag_z_coeffs is None:
-            return 0.0
-        r = np.hypot(x, y)
-        a, b = self.sag_z_coeffs
-        dz = float(np.clip(a * r + b * r * r, -0.03, 0.03))  # pojistka proti preklepu v mereni
-        return dz
+    # o kolik [m] posunout zadane (x, y, z) pred IK (dx, dy, dz), aby se vyrusila zmerena chyba
+    def __err_comp(self, x, y):
+        if self.err_coeffs is None:
+            return 0.0, 0.0, 0.0
+        d = _err_basis(x, y) @ self.err_coeffs                                 # (3,) = dx, dy, dz
+        d = np.clip(d, -0.03, 0.03)                                            # pojistka proti preklepu
+        return float(d[0]), float(d[1]), float(d[2])
 
     def goToPos(self, x, y, z): # hlidat max min motoru
         try:
