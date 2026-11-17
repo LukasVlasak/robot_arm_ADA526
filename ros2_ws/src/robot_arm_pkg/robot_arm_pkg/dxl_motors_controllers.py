@@ -72,8 +72,6 @@ JOINT5_LIM = [-300*pi/180, 300*pi/180]
 DH_OFFSETS = [2108, -2070, 8179, 2321, -12]
 DIRECTIONS = [1, -1, -1, -1, 1]
 
-R_FLIP = 0.25 # kdy pero natocito 180 jako vychozi hodnota solveru
-
 ROBOT_QR = [0, 0, 0, 0, 0]
 
 ACTIVE_MOTORS = [1, 2, 3, 4, 5]
@@ -203,9 +201,8 @@ class DXLMotorsController(Node):
             jedno, takze pero muze dojet sikmo. Kolme reseni je pro micky kravina.
         """
         z = z + self.__sag_z(x, y)   # zbytkova kompenzace pruhybu v Z (viz SAG_Z_SAMPLES)
-        T = SE3(x, y, z) * SE3.Rx(np.pi)
 
-        q = self.__solve_ik(T, x, y, max_tilt_deg, ball)
+        q = self.__solve_ik(x, y, z, max_tilt_deg, ball)
         if q is None:
             raise ValueError(f"Bod ({x}, {y}, {z}) je mimo dosah")
 
@@ -301,32 +298,49 @@ class DXLMotorsController(Node):
         if msg.command == 'move':
             self.goToPos(msg.x, msg.y, msg.z)
 
-
+    # 2 seedy: rameno natocene k bodu (q1 = atan2), hrot pera jednou ven od zakladny (q5 = 0)
+    # a jednou k zakladne (q5 = pi). Hrot je LINK5_OFFSET mimo osu motoru 5, takze tyhle
+    # dve polohy jsou krajni varianty a solver z nich dojde ke dvema ruznym resenim.
     def __seeds(self, x, y):
-        r = np.hypot(x, y)
-        q5 = pi if r < R_FLIP else 0.0
+        q1 = float(np.clip(np.arctan2(y, x), *JOINT1_LIM))
+        return [np.array([q1, 0, 0, -45*pi/180, q5]) for q5 in (0.0, pi)]
 
-        preferred = np.array([0, 0, 0, -45*pi/180, q5])
-        other     = np.array([0, 0, 0, -45*pi/180, pi - q5])
-        return [preferred, other]
+    # rezerva od limitu kloubu, normovana rozsahem: 0 = na limitu, 0.5 = stred, <0 = mimo
+    def __limit_margin(self, q):
+        lo, hi = self.robot.qlim
+        return np.min(np.minimum(q - lo, hi - q) / (hi - lo))
 
-    def __solve_ik(self, T, x, y, max_tilt_deg, ball=False):
-        seeds = self.__seeds(x, y)
+    # zkusi vsechny seedy a vrati reseni s nejvetsi rezervou od limitu (PO __correct_q),
+    # ne prvni nalezene -> vyuzije natoceni motoru 5, misto aby skoncil na limitu kloubu
+    def __solve_ik(self, x, y, z, max_tilt_deg, ball=False):
+        # micek: staci dojet na POZICI, orientace (naklon) pera je jedno
+        # precision: nejdriv kolmo, pak fallback jen na pozici (hlida max_tilt_deg)
+        masks = [[1, 1, 1, 0, 0, 0]] if ball else [[1, 1, 1, 1, 1, 0], [1, 1, 1, 0, 0, 0]]
 
-        # micek: staci dojet na POZICI, orientace (naklon) pera je jedno -> pero
-        # klidne sikmo. Zadne hledani kolmo, zadne omezeni naklonu.
-        if ball:
-            for q0 in seeds:
-                sol = self.robot.ikine_LM(T, q0=q0, mask=[1, 1, 1, 0, 0, 0], joint_limits=True)
-                if sol.success:
-                    return np.array(sol.q)
-            return None
+        for mask in masks:
+            best_q, best_m = None, 0.0
+            for q0 in self.__seeds(x, y):
+                # cilove natoceni kolem Z = natoceni seedu -> chyba kolem Z je na startu ~0
+                # (Z je v masce stejne volna, ale velka chyba kolem Z kazi konvergenci)
+                R0 = self.robot.fkine(q0).R
+                yaw = np.arctan2(R0[1, 0], R0[0, 0])
+                T = SE3(x, y, z) * SE3.Rz(yaw) * SE3.Rx(pi)
 
-        for mask in ([1, 1, 1, 1, 1, 0], [1, 1, 1, 0, 0, 0]):   # nejdriv kolmo, pak fallback
-            for q0 in seeds:                                    # nejdriv preferovana vetev
-                sol = self.robot.ikine_LM(T, q0=q0, mask=mask, joint_limits=True)
-                if sol.success and self.__pen_tilt(sol.q) <= max_tilt_deg:
-                    return np.array(sol.q)
+                # slimit=1 -> zadne nahodne restarty, kazdy seed da svoje "blizke" reseni
+                sol = self.robot.ikine_LM(T, q0=q0, mask=mask, joint_limits=True, slimit=1)
+                if not sol.success:
+                    continue
+
+                q = np.array(sol.q)
+                if not ball and self.__pen_tilt(q) > max_tilt_deg:
+                    continue
+
+                m = self.__limit_margin(self.__correct_q(q))   # limity az PO korekci
+                if m > best_m:
+                    best_q, best_m = q, m
+
+            if best_q is not None:
+                return best_q
         return None
 
 
