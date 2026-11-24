@@ -1,8 +1,6 @@
 # Mereni: realna poloha vs. poloha namerena kamerou
 # Jednotky: mm
 # err_y = y_kamera - y_real
-# Radky oznacene * : err_y v sesite chybel, je dopocitany
-# Radky oznacene ? : nejiste precteni, viz poznamky dole
 
 # x_real  y_real  z_real   x_kam  y_kam  z_kam   err_y
   250     -15     75       241     -8    72       +7   *?
@@ -25,8 +23,3 @@
   265      65     75       241     69    71       +4
   265     115     75       242    103    72      -12
 
-# Poznamky k precteni:
-# - radek 1: x_real ctu jako 250, ale kamera (241, -8, 72) odpovida spis bodum s x_real = 265
-# - radek 5: y_kam ctu jako -154, to by davalo err_y = +11; v sesite je +9 (sedelo by y_kam = -156)
-# - radky 5 a 8: prvni cislice x_real vypada jako 2, beru 450 podle x_kam (443, 441)
-# - blok 335: x_real bylo v sesite prepsane (puvodne 325/320) na 335
