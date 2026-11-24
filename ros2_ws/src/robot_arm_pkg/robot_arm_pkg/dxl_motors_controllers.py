@@ -16,7 +16,7 @@ import asyncio
 import time
 
 
-# TODO: self.current_q SE TED NEUPDATUJE - ZATIM NEPOUZIVAM TAKZE OK 
+# TODO: self.current_q IS NOT UPDATING - NOT USING IT YET, so its ok
 
 
 # k 12 0.15
@@ -37,25 +37,21 @@ WEIGHT_POS_MOTORS = {
     5: 1250,
 }
 
-# bod (-1, -1, -1) v Motor akci znamena "jed do HOME pozice"
 HOME_SENTINEL = -1.0
 
-# jak dlouho cekat po dojezdu na bod, nez se rameno dokmita [s]
-# precision ma 2 approach vysky nad teckou: prvni (vyssi) a druha (nizsi)
-SETTLE_TIME_APPROACH_1 = 2   # prvni (vyssi) priblizeni
-SETTLE_TIME_APPROACH_2 = 4   # druhe (nizsi) priblizeni
+# precision has 2 approaches height
+SETTLE_TIME_APPROACH_1 = 2  
+SETTLE_TIME_APPROACH_2 = 4  
 SETTLE_TIME_LOW = 0.1
 
-# delsi ustaleni na dwell bodu (precision: settle_point_index z Motor goalu) [s]
+# settle time at dwell point 
 DWELL_SETTLE_TIME = 2
 
-# ustaleni na odpalovem bodu pred rychlym svihem (ball: settle_point_index) [s]
 BALL_SETTLE_TIME = 1.5
 
-# precision potrebuje pero vic kolmo k desce nez micek -> mensi povoleny naklon [deg]
 PRECISION_MAX_TILT_DEG = 10
 
-# pauza po zadani pohybu, nez motory nabehnou a is_moving spolehlive hlasi pohyb [s]
+# time to wait until check is_moving
 MOVE_START_DELAY = 0.2
 
 LINK1 = 0.220
@@ -66,12 +62,11 @@ LINK4_OFFSET = -0.00262
 LINK5_OFFSET = 0.043
 
 JOINT1_LIM = [-90*pi/180, 90*pi/180]
-JOINT2_LIM = [ -70*pi/180, 70*pi/180] # odecetl jsem 5 stupnu v zapornych i v kladnych kvuli testovani
-JOINT3_LIM = [-50*pi/180, 180*pi/180] # odecetl jsem 5 stupnu v zapornych i v kladnych kvuli testovani
-JOINT4_LIM = [ -92*pi/180, 85*pi/180] # odecetl jsem 5 stupnu v zapornych i v kladnych kvuli testovani
+JOINT2_LIM = [ -70*pi/180, 70*pi/180]
+JOINT3_LIM = [-50*pi/180, 180*pi/180]
+JOINT4_LIM = [ -92*pi/180, 85*pi/180]
 JOINT5_LIM = [-200*pi/180, 200*pi/180]
 
-# jsem dat primo namerenou hodnotu curr pos motoru kdyz bude sedet s DH modelem
 DH_OFFSETS = [2106, 2004, 4019, 2285, 12]
 DIRECTIONS = [1, -1, -1, -1, 1]
 
@@ -81,59 +76,52 @@ ACTIVE_MOTORS = [1, 2, 3, 4, 5]
 
 TESTING_MOTORS_SPEED = 50
 
-GEAR = np.array([1, 4, 3, 1, 1]) # kdyz nebude fungovat tak toto upravit 
+GEAR = np.array([1, 4, 3, 1, 1])
 
 # just for testing
-ARROW_UPDATE_EVERY = 20 # update current_q every 10 steps
+ARROW_UPDATE_EVERY = 20 # update current_q every 20 steps
 
-# --- kompenzace pruhybu ---
-# realne zmerena poloha hrotu [x, y, z] v metrech v kalibracni poloze CALIB_Q se ZAPNUTYM torque
-# po kazde nove kalibraci zmerit a prepsat; None = kompenzace vypnuta
 CALIB_MEASURED_XYZ = [0.588, 0.0, 0.106]
 CALIB_Q = [0, 0, 0, 0, 0]
-# pruhyb ramene (kloub 2) podle vodorovneho dosahu zapesti [rad/m], z fitu namerenych bodu
+
 SAG_K2 = -0.051
 
-# --- zbytkova kompenzace chyby hrotu ve VSECH osach (dolad po vyse uvedene kompenzaci) ---
-# Mrizka mereni: pro kazdy ZADANY bod (x, y) [m] (z se zadava vzdy ERR_CMD_Z)
-# zmer skutecnou polohu hrotu [x, y, z] [m]. None = jeste nezmereno.
-# Z techto bodu se nafituje korekce (zadane - zmerene) v kazde ose a pricte se
-# k zadanemu bodu pred IK, cimz se chyba vyrusi (viz __compute_err_coeffs / __err_comp).
-ERR_CMD_Z = 0.005   # vyska [m], na ktere meris vsechny body
+
+ERR_CMD_Z = 0.005
 
 ERR_SAMPLES = [
-    # ((x_zadane, y_zadane) [m],  [x_mer, y_mer, z_mer] [m] | None)
-    # --- x = 0.575 ---
+    # ((x_set, y_set) [m],  [x_real, y_real, z_real] [m] | None)
+
     ((0.575,  0.000), [0.579,-0.002,-0.004]),
     ((0.575,  0.125), [0.579, 0.128, -0.005]),
     ((0.575,  0.225), [0.582, 0.228, -0.006]),
     ((0.575, -0.125), [0.582, -0.136, 0.000]),
     ((0.575, -0.225), [0.583, -0.229, -0.005]),
-    # --- x = 0.500 ---
+
     ((0.500,  0.000), [0.503, -0.003, -0.004]),
     ((0.500,  0.125), [0.503, 0.125, -0.003]),
     ((0.500,  0.225), [0.502, 0.227, -0.004]),
     ((0.500, -0.125), [0.503, -0.130, -0.003]),
     ((0.500, -0.225), [0.501, -0.231, -0.003]),
-    # --- x = 0.425 ---
+
     ((0.425,  0.000), [0.426, -0.001, -0.001]),
     ((0.425,  0.125), [0.429, 0.121, -0.001]),
     ((0.425,  0.225), [0.428, 0.224, -0.002]),
     ((0.425, -0.125), [0.426, -0.124, -0.002]),
     ((0.425, -0.225), [0.427, -0.223, -0.003]),
-    # --- x = 0.350 ---
+
     ((0.350,  0.000), [0.351, -0.002, 0.003]),
     ((0.350,  0.125), [0.352, 0.123, 0.002]),
     ((0.350,  0.225), [0.352, 0.224, 0.000]),
     ((0.350, -0.125), [0.350, -0.128, 0.002]),
     ((0.350, -0.225), [0.351, -0.224, -0.001]),
-    # --- x = 0.275 ---
+
     ((0.275,  0.000), [0.272, -0.004, 0.001]),
     ((0.275,  0.125), [0.278, 0.124, 0.004]),
     ((0.275,  0.225), [0.277, 0.224, 0.002]),
     ((0.275, -0.125), [0.276, -0.128, 0.004]),
     ((0.275, -0.225), [0.276, -0.225, 0.002]),
-    # --- x = 0.200 ---
+
     ((0.200,  0.000), [0.200, -0.003, 0.002]),
     ((0.200,  0.125), [0.200, 0.122, 0.002]),
     ((0.200,  0.225), [0.201, 0.222, 0.000]),
@@ -141,14 +129,11 @@ ERR_SAMPLES = [
     ((0.200, -0.225), [0.195, -0.225, 0.000]),
 ]
 
-# bazove funkce fitu chyby: bivariatni polynom v (x, y) do 2. stupne.
-# Pro presnejsi fit sem lze pridat dalsi cleny (napr. x*x*y, x*y*y, ...),
-# jen musi byt zmerenych bodu aspon tolik, kolik je clenu.
+# bivariat polynom in (x, y) 
 def _err_basis(x, y):
     return np.array([1.0, x, y, x * x, x * y, y * y])
 
-MOTOR_STATUS_PERIOD = 1.0   # jak casto [s] publikovat teplotu a proud motoru
-
+MOTOR_STATUS_PERIOD = 1.0
 
 class DXLMotorsController(Node):
     def __init__(self):
@@ -183,8 +168,7 @@ class DXLMotorsController(Node):
             cancel_callback=self.cancel_callback,
         )
 
-        # --- monitor teploty a proudu motoru (pro zavesovani zavazi) ---
-        # ODKOMENTUJ tenhle blok, aby se zacalo publikovat na /motor_status:
+        # /motor_status
         # self.motor_status_pub = self.create_publisher(String, 'motor_status', 10)
         # try:
         #     self.current_limits = self.dxlMotors.getMotorsCurrentLimit(ACTIVE_MOTORS)
@@ -193,10 +177,6 @@ class DXLMotorsController(Node):
         #     self.get_logger().warn(f'Nelze precist current limity motoru: {e}')
         # self.create_timer(MOTOR_STATUS_PERIOD, self.__publish_motor_status)
 
-    # precte teplotu + proud vsech motoru najednou a publikuje je na /motor_status.
-    # % = |present_current| / current_limit -> jak blizko je motor svemu max momentu.
-    #
-    # Zobrazeni v konzoli:   ros2 topic echo /motor_status --field data
     def __publish_motor_status(self):
         try:
             temps = self.dxlMotors.getMotorsTemperature(ACTIVE_MOTORS)
@@ -253,8 +233,6 @@ class DXLMotorsController(Node):
                 self.get_logger().error(f'Error at DXL occured: {e}')
 
     # updating kinematic model
-    # dat do moving pomoci tech arrows
-    # ale volat to ne pokazde ale po chvili
     def __updateCurrentQ(self):
         actual_steps = self.dxlMotors.getMotorsPos()
 
@@ -262,7 +240,7 @@ class DXLMotorsController(Node):
             steps2rad(pos) for pos in actual_steps
         ])
 
-        # kroky motoru na uhel v kloubu DH modelu
+        # steps of motor to the angle in joint of DH model
         self.current_q = self.directions * (q_motor - self.offsets) / GEAR
 
     def __pen_tilt(self, q):
@@ -274,14 +252,6 @@ class DXLMotorsController(Node):
         self.get_logger().info(f"Setting motor {id} acc to: {acc}")
 
     def coordsToSteps(self, x, y, z, max_tilt_deg=25, ball=False):
-        """
-            max_tilt_deg o jak moc muze bejt pero nakloneno k base
-            tudiz u precision mene, nebo jak moc jsme schopny aby to bylo aby to jeste udelalo tecku
-            u micku nam to je jedno
-
-            ball=True -> IK resi POUZE pozici (maska 1,1,1,0,0,0), orientace pera je
-            jedno, takze pero muze dojet sikmo. Kolme reseni je pro micky kravina.
-        """
         dx, dy, dz = self.__err_comp(x, y)   # kompenzace zmerene chyby hrotu ve vsech osach
         x, y, z = x + dx, y + dy, z + dz
 
@@ -299,13 +269,12 @@ class DXLMotorsController(Node):
 
         return steps
 
-    # vodorovna vzdalenost zapesti (kloub 4) od osy zakladny
+    # vertical distance of joint 4 from base
     def __wrist_reach(self, q):
         a2 = q[1] + self.robot.links[1].offset
         a3 = a2 + q[2] + self.robot.links[2].offset
         return LINK2 * np.cos(a2) + LINK3 * np.cos(a3)
 
-    # z rozdilu mezi zmerenou a modelovou polohou hrotu v CALIB_Q dopocita offsety kloubu 1-3
     def __compute_joint_bias(self):
         bias = np.zeros(5)
         if CALIB_MEASURED_XYZ is None:
@@ -322,7 +291,6 @@ class DXLMotorsController(Node):
             self.get_logger().warn('Kompenzace: offset kloubu > 8 deg, zkontroluj CALIB_MEASURED_XYZ')
         return bias
 
-    # realny uhel kloubu = zadany + delta, takze zadavame q - delta
     def __correct_q(self, q):
         if CALIB_MEASURED_XYZ is None:
             return q
@@ -331,8 +299,6 @@ class DXLMotorsController(Node):
         delta[1] += SAG_K2 * (self.__wrist_reach(q) - self.__wrist_reach(CALIB_Q))
         return np.array(q) - delta
 
-    # z namerenych bodu (ERR_SAMPLES) nafituje korekci (zadane - zmerene) ve vsech 3 osach
-    # jako bivariatni polynom v (x, y). Vraci matici koeficientu (n_bazi, 3) nebo None.
     def __compute_err_coeffs(self):
         pts = [((xc, yc), m) for (xc, yc), m in ERR_SAMPLES if m is not None]
         n_basis = len(_err_basis(0.0, 0.0))
@@ -341,28 +307,26 @@ class DXLMotorsController(Node):
                 f'ERR: zmereno {len(pts)} bodu (potreba >={n_basis}) -> XYZ korekce vypnuta')
             return None
 
-        A = np.array([_err_basis(xc, yc) for (xc, yc), _ in pts])              # (n, n_bazi)
-        # korekce = zadane - zmerene (pricte se k zadanemu bodu pred IK)
+        A = np.array([_err_basis(xc, yc) for (xc, yc), _ in pts])
         B = np.array([[xc - m[0], yc - m[1], ERR_CMD_Z - m[2]]
-                      for (xc, yc), m in pts])                                 # (n, 3)
-        coeffs = np.linalg.lstsq(A, B, rcond=None)[0]                          # (n_bazi, 3)
+                      for (xc, yc), m in pts])
+        coeffs = np.linalg.lstsq(A, B, rcond=None)[0]
 
-        rms_raw = np.sqrt(np.mean(B ** 2, axis=0)) * 1000                      # chyba pred fitem
-        rms_res = np.sqrt(np.mean((B - A @ coeffs) ** 2, axis=0)) * 1000       # rezidua po fitu
+        rms_raw = np.sqrt(np.mean(B ** 2, axis=0)) * 1000
+        rms_res = np.sqrt(np.mean((B - A @ coeffs) ** 2, axis=0)) * 1000
         self.get_logger().info(
             f'ERR fit z {len(pts)} bodu | RMS chyby [mm] x/y/z: {np.round(rms_raw, 2)} '
             f'-> rezidua [mm]: {np.round(rms_res, 2)}')
         return coeffs
 
-    # o kolik [m] posunout zadane (x, y, z) pred IK (dx, dy, dz), aby se vyrusila zmerena chyba
     def __err_comp(self, x, y):
         if self.err_coeffs is None:
             return 0.0, 0.0, 0.0
-        d = _err_basis(x, y) @ self.err_coeffs                                 # (3,) = dx, dy, dz
-        d = np.clip(d, -0.03, 0.03)                                            # pojistka proti preklepu
+        d = _err_basis(x, y) @ self.err_coeffs
+        d = np.clip(d, -0.03, 0.03) # just for typo
         return float(d[0]), float(d[1]), float(d[2])
 
-    def goToPos(self, x, y, z): # hlidat max min motoru
+    def goToPos(self, x, y, z): 
         try:
             steps = self.coordsToSteps(x, y, z)
         except ValueError as e:
@@ -384,35 +348,25 @@ class DXLMotorsController(Node):
         if msg.command == 'move':
             self.goToPos(msg.x, msg.y, msg.z)
 
-    # 2 seedy: rameno natocene k bodu (q1 = atan2), hrot pera jednou ven od zakladny (q5 = 0)
-    # a jednou k zakladne (q5 = pi). Hrot je LINK5_OFFSET mimo osu motoru 5, takze tyhle
-    # dve polohy jsou krajni varianty a solver z nich dojde ke dvema ruznym resenim.
     def __seeds(self, x, y):
         q1 = float(np.clip(np.arctan2(y, x), *JOINT1_LIM))
         return [np.array([q1, 0, 0, -45*pi/180, q5]) for q5 in (0.0, pi)]
 
-    # rezerva od limitu kloubu, normovana rozsahem: 0 = na limitu, 0.5 = stred, <0 = mimo
     def __limit_margin(self, q):
         lo, hi = self.robot.qlim
         return np.min(np.minimum(q - lo, hi - q) / (hi - lo))
 
-    # zkusi vsechny seedy a vrati reseni s nejvetsi rezervou od limitu (PO __correct_q),
-    # ne prvni nalezene -> vyuzije natoceni motoru 5, misto aby skoncil na limitu kloubu
     def __solve_ik(self, x, y, z, max_tilt_deg, ball=False):
-        # micek: staci dojet na POZICI, orientace (naklon) pera je jedno
-        # precision: nejdriv kolmo, pak fallback jen na pozici (hlida max_tilt_deg)
+        # one for precision one for ball
         masks = [[1, 1, 1, 0, 0, 0]] if ball else [[1, 1, 1, 1, 1, 0], [1, 1, 1, 0, 0, 0]]
 
         for mask in masks:
             best_q, best_m = None, 0.0
             for q0 in self.__seeds(x, y):
-                # cilove natoceni kolem Z = natoceni seedu -> chyba kolem Z je na startu ~0
-                # (Z je v masce stejne volna, ale velka chyba kolem Z kazi konvergenci)
                 R0 = self.robot.fkine(q0).R
                 yaw = np.arctan2(R0[1, 0], R0[0, 0])
                 T = SE3(x, y, z) * SE3.Rz(yaw) * SE3.Rx(pi)
 
-                # slimit=1 -> zadne nahodne restarty, kazdy seed da svoje "blizke" reseni
                 sol = self.robot.ikine_LM(T, q0=q0, mask=mask, joint_limits=True, slimit=1)
                 if not sol.success:
                     continue
@@ -421,7 +375,7 @@ class DXLMotorsController(Node):
                 if not ball and self.__pen_tilt(q) > max_tilt_deg:
                     continue
 
-                m = self.__limit_margin(self.__correct_q(q))   # limity az PO korekci
+                m = self.__limit_margin(self.__correct_q(q))   # limits after the correction
                 if m > best_m:
                     best_q, best_m = q, m
 
@@ -430,16 +384,16 @@ class DXLMotorsController(Node):
         return None
 
 
-    # pro cli set_speed
+    # for cli cmd set_speed
     def __set_speed_callback(self, msg):
         dxl_id, speed = (int(v) for v in msg.data.split())
         self.setMotorSpeed(dxl_id, speed)
 
-    # pro cli disable_torque
+    # for cli cmd disable_torque
     def __disable_torque_callback(self, msg):
         self.dxlMotors.setDXLTorqueEnabled(False)
 
-    # pro cli go_home
+    # for cli cmd go_home
     def __go_home_callback(self, msg):
         self.dxlMotors.setMotorsGoalPos(list(HOME_POS_MOTORS.values()))
         self.get_logger().info('Going home...')
@@ -448,12 +402,10 @@ class DXLMotorsController(Node):
         self.dxlMotors.setSingleMotorSpeed(dxl_id, speed)
         self.get_logger().info(f'Speed {speed} was set to motor {dxl_id}')
 
-    # kroky motoru na uhel v kloubu v DH modelu
     def __stepsToQ(self, i, steps):
         self.get_logger().info(f'steps: {steps}')
         return self.directions[i] * (steps2rad(steps) - self.offsets[i]) / GEAR[i]
 
-    # i je index kloubu -> 0 - 4
     def __check_motor_limits(self, i, q):
         lo, hi = self.robot.qlim[:, i]
         if not lo <= q <= hi:
@@ -467,8 +419,8 @@ class DXLMotorsController(Node):
                     rtb.RevoluteDH(d=LINK1, alpha=pi/2, qlim=JOINT1_LIM), 
                     rtb.RevoluteDH(a=LINK2, qlim=JOINT2_LIM, offset=45*pi/180),
                     rtb.RevoluteDH(a=LINK3, qlim=JOINT3_LIM, offset=-90*pi/180),
-                    rtb.RevoluteDH(a=LINK4_OFFSET, alpha=pi/2, qlim=JOINT4_LIM, offset=90*pi/180), # tady kdyztak a misto d
-                    rtb.RevoluteDH(d=LINK4, a=LINK5_OFFSET, qlim=JOINT5_LIM), # tady kdyztak a misto d a d misto a 
+                    rtb.RevoluteDH(a=LINK4_OFFSET, alpha=pi/2, qlim=JOINT4_LIM, offset=90*pi/180), 
+                    rtb.RevoluteDH(d=LINK4, a=LINK5_OFFSET, qlim=JOINT5_LIM), 
                 ], name="Robot arm")
         robot.qr = ROBOT_QR
 
@@ -486,13 +438,8 @@ class DXLMotorsController(Node):
                 and point.y == HOME_SENTINEL
                 and point.z == HOME_SENTINEL)
 
-    # --------------------------------------------------
-    # SPOLECNE POHYBOVE METODY (ball i precision)
-    # --------------------------------------------------
-
-    # ceka dokud se motory tocej; vraci False pokud prisel cancel
+    # ball & precision actions
     def __wait_until_stopped(self, goal_handle, move_start_delay = 0.2, time_sleep = 0.1):
-        # kratka pauza, aby motory stacily nabehnout a is_moving spolehlive hlasil pohyb
         time.sleep(move_start_delay)
 
         while self.dxlMotors.getMotorsMoving():
@@ -501,7 +448,6 @@ class DXLMotorsController(Node):
             time.sleep(time_sleep)
         return True
 
-    # nastavi rychlosti (pole - jedna na motor) a jede na jeden bod (karteziansky, nebo HOME sentinel)
     def __move_to_point(self, point, speeds, max_tilt_deg=25):
         self.dxlMotors.setMotorsSpeed(speeds)
 
@@ -513,16 +459,9 @@ class DXLMotorsController(Node):
             self.get_logger().info(f'Moving to point: speeds={speeds}, steps={steps}')
             self.makeMove(steps)
 
-    # --------------------------------------------------
-    # SEKVENCE BODU
-    # --------------------------------------------------
 
-    # ball: DULEZITE - spocita vsechnu kinematiku DOPREDU (soutez meri cas pohybu),
-    # pak jede body za sebou a ceka jen na dokonceni pohybu.
-    # HOME sentinel se neresi pres IK - jedou se pevne kroky HOME_POS_MOTORS.
-    # Na odpalovem bodu (settle_point_index) necha rameno ustalit pred rychlym svihem.
     async def __run_ball_sequence(self, goal_handle, points, speeds):
-        settle_idx = goal_handle.request.settle_point_index  # -1 = zadny
+        settle_idx = goal_handle.request.settle_point_index
         self.setSingleMotorAcc(1, 50)
         self.setSingleMotorAcc(2, 120)
 
@@ -544,7 +483,6 @@ class DXLMotorsController(Node):
             self.dxlMotors.setMotorsSpeed(speeds[i].speeds)
             self.makeMove(steps)
 
-            # odpalovy bod pred svihem - nechat rameno ustalit, nez vyrazi BOOM
             if i == settle_idx:
                 if not self.__wait_until_stopped(goal_handle):
                     return False
@@ -554,9 +492,8 @@ class DXLMotorsController(Node):
 
         return self.__wait_until_stopped(goal_handle)
 
-    # precision: jako ball, ale po dojezdu na kazdy bod necha rameno SETTLE_TIME ustalit
     async def __run_precision_sequence(self, goal_handle, points, speeds):
-        dwell_idx = goal_handle.request.settle_point_index  # -1 = zadny
+        dwell_idx = goal_handle.request.settle_point_index
         for i, point in enumerate(points):
             if not self.__wait_until_stopped(goal_handle):
                 return False
@@ -565,7 +502,6 @@ class DXLMotorsController(Node):
 
             if not self.__wait_until_stopped(goal_handle):
                 return False
-            # po najeti nad bod, pockat nez se dokmita
 
             if (i == 0):
                 time.sleep(SETTLE_TIME_APPROACH_1)
@@ -586,8 +522,6 @@ class DXLMotorsController(Node):
             if len(points) != len(speeds):
                 raise ValueError("Number of points and speeds does not match")
 
-            # is_ball_action flag z Motor goalu rozhoduje: ball predpocita vse dopredu
-            # a jede bez ustalovani, precision necha po kazdem bodu rameno ustalit
             if goal_handle.request.is_ball_action:
                 completed = await self.__run_ball_sequence(goal_handle, points, speeds)
             else:
