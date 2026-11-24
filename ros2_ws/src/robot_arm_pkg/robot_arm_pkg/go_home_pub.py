@@ -21,7 +21,7 @@ def main():
         print("Motor controller nebezi")
     else:
         pub.publish(Empty())
-        rclpy.spin_once(node, timeout_sec=0.2) # at se zprava stihne poslat
+        rclpy.spin_once(node, timeout_sec=0.2) 
 
     node.destroy_node()
     rclpy.shutdown()

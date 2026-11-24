@@ -9,21 +9,16 @@ from tf2_geometry_msgs import do_transform_point
 from geometry_msgs.msg import PointStamped
 from std_msgs.msg import Empty
 
-
-# ==========================================
-# FILTR SOURADNIC (kamera obcas hodi nesmysl, napr. 6 m v x)
-# ==========================================
-
-# povolene limity v base_frame [m] - bod mimo se zahodi
+# allowed limits in base_frame [m] – points outside are discarded
 X_MIN, X_MAX = 0.0, 0.600
 Y_MIN, Y_MAX = -0.300, 0.300
 Z_MIN, Z_MAX = 0.0, 0.200
 
-# kolik po sobe jdoucich PLATNYCH (v limitech) vzorku musi sedet, nez se publikuje
+# How many consecutive VALID (within-limits) samples must match before publication
 STABLE_WINDOW = 15
 
-# jak moc smi byt tech STABLE_WINDOW vzorku rozhazenych [m] (rozptyl na kazde ose)
-# dokud se kamera "neuklidni" pod tuhle hranici, nic se neposila
+# maximum allowable dispersion [m] of the STABLE_WINDOW samples (variance along each axis)
+# nothing is sent until the camera "settles" below this threshold
 STABLE_TOL = 0.0012  # 1.2 mm
 
 
@@ -37,16 +32,15 @@ class BallTransformer(Node):
             self.tf_buffer, self
         )
 
-        # kruhove buffery poslednich platnych vzorku (v base_frame) na barvu
         self.green_buffer = deque(maxlen=STABLE_WINDOW)
         self.red_buffer = deque(maxlen=STABLE_WINDOW)
 
-        # filtr NENI prubezny - bezi az po capture requestu (z ball_node).
-        # Jinak by po presunu micku hrozilo publikovani stare pozice drive,
-        # nez se buffer stihne naplnit novymi vzorky.
+        #  The filter is NOT continuous—it runs only after a capture request (from `ball_node`).
+        # Otherwise, after the ball moves, there would be a risk of publishing the old position
+        # before the buffer has time to fill with new samples.
         self.armed = {'Green': False, 'Red': False}
 
-        # Capture request - vymaze buffery a spusti sber cerstvych vzorku
+        # Capture request - clear the buffers and start the collection of fresh samples
         self.sub_capture = self.create_subscription(
             Empty,
             '/ball_capture',
@@ -54,7 +48,6 @@ class BallTransformer(Node):
             10
         )
 
-        # Subscribers
         self.sub_green = self.create_subscription(
             PointStamped,
             '/goal_green_point',
@@ -69,7 +62,6 @@ class BallTransformer(Node):
             10
         )
 
-        # Publishers
         self.pub_green = self.create_publisher(
             PointStamped,
             '/goal_green_base',
@@ -84,9 +76,9 @@ class BallTransformer(Node):
 
         self.get_logger().info('BallTransformer started')
 
-    # --------------------------------------------------
-    # FILTR
-    # --------------------------------------------------
+    # ==========================================
+    # Helpers
+    # ==========================================
 
     def __in_limits(self, p):
         return (X_MIN <= p.x <= X_MAX
@@ -94,7 +86,6 @@ class BallTransformer(Node):
                 and Z_MIN <= p.z <= Z_MAX)
 
     def __is_stable(self, buffer):
-        # potreba plne okno a rozptyl na kazde ose pod toleranci
         if len(buffer) < STABLE_WINDOW:
             return False
 
@@ -115,28 +106,11 @@ class BallTransformer(Node):
         out.point.z = sum(p.z for p in buffer) / n
         return out
 
-    # --------------------------------------------------
-    # CAPTURE REQUEST
-    # --------------------------------------------------
-
-    def capture_callback(self, msg):
-        # novy pozadavek -> zahodit stare vzorky a zacit sbirat cerstve
-        self.green_buffer.clear()
-        self.red_buffer.clear()
-        self.armed['Green'] = True
-        self.armed['Red'] = True
-        self.get_logger().info('Capture request - sbiram cerstve vzorky')
-
-    # --------------------------------------------------
-    # ZPRACOVANI
-    # --------------------------------------------------
 
     def process_point(self, msg, buffer, publisher, color):
-        # bez aktivniho capture requestu kameru ignorujeme (zadne stare hodnoty)
         if not self.armed[color]:
             return
 
-        # 1) prevod do base_frame
         try:
             transform = self.tf_buffer.lookup_transform(
                 'base_frame',
@@ -155,7 +129,6 @@ class BallTransformer(Node):
 
         p = transformed.point
 
-        # 2) zahodit nesmyslne hodnoty mimo limity (kamera obcas blbne)
         if not self.__in_limits(p):
             self.get_logger().warning(
                 f'{color} mimo limity, zahozeno: '
@@ -164,10 +137,8 @@ class BallTransformer(Node):
             )
             return
 
-        # 3) platny vzorek do bufferu
         buffer.append(p)
 
-        # 4) dokud nemame plne okno stabilnich vzorku, jen cekame
         if not self.__is_stable(buffer):
             self.get_logger().info(
                 f'{color} ceka na ustaleni: '
@@ -176,8 +147,6 @@ class BallTransformer(Node):
             )
             return
 
-        # 5) stabilni -> publikuj prumer okna JEDNOU a uspi se (disarm),
-        # aby se pozdeji neposlala stara hodnota pred dalsim capture requestem
         stable = self.__mean_point(buffer, transformed.header)
         publisher.publish(stable)
         self.armed[color] = False
@@ -189,11 +158,22 @@ class BallTransformer(Node):
             f'z={stable.point.z:.3f}'
         )
 
+    # ==========================================
+    # Callbacks
+    # ==========================================
+    
     def green_callback(self, msg):
         self.process_point(msg, self.green_buffer, self.pub_green, 'Green')
 
     def red_callback(self, msg):
         self.process_point(msg, self.red_buffer, self.pub_red, 'Red')
+    
+    def capture_callback(self, msg):
+        self.green_buffer.clear()
+        self.red_buffer.clear()
+        self.armed['Green'] = True
+        self.armed['Red'] = True
+        self.get_logger().info('Capture request - sbiram cerstve vzorky')
 
 
 def main(args=None):

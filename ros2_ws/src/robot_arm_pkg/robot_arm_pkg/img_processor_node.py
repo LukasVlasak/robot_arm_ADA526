@@ -51,7 +51,6 @@ class ImageProcessor(Node):
         self.fig.add_subplot(2, 2, 3)   # axes[2] = green mask
         self.fig.add_subplot(2, 2, 4)   # axes[3] = red mask
 
-        # polomer micku [mm] - depth je na predni stenu, korekce na stred
         self.BALL_R = 20.0
 
         self.centroids_green = None
@@ -60,9 +59,10 @@ class ImageProcessor(Node):
         self.depth_red = 5.0
         self.intrinsics = rs.intrinsics()
 
-    # ------------------------------------------------------------------
+    # ==========================================
     # Helpers
-    # ------------------------------------------------------------------
+    # ==========================================
+
     def find_centroids(self, mask_img, min_area=1000, max_area=100000):
         try:
             blobs = mask_img.blobs()
@@ -117,9 +117,6 @@ class ImageProcessor(Node):
             try:
                 point = rs.rs2_deproject_pixel_to_point(
                     self.intrinsics, centroid, depth)
-                # depth je k prednimu POVRCHU micku -> posun bod po paprsku
-                # o polomer na STRED micku (spravi x i y zaroven).
-                # metricke (mm), nezavisle na rozliseni kamery.
                 if depth > 0:
                     scale = (depth + self.BALL_R) / depth
                     point = [c * scale for c in point]
@@ -132,15 +129,15 @@ class ImageProcessor(Node):
         if centroid is None:
             return old_depth
         h, w = img.image.shape[:2]
-        # order of coordinates is reversed in numpy array img.image
         x, y = int(centroid[0]), int(centroid[1])
         if 0 <= x < w and 0 <= y < h and img.image[y, x] != 0:
             return float(img.image[y, x])
         return old_depth
 
-    # ------------------------------------------------------------------
-    # Debug plots
-    # ------------------------------------------------------------------
+    # ==========================================
+    # Plot for debuging
+    # ==========================================
+
     def plot_centroids(self, ax):
         if self.centroids_green is not None:
             ax.plot(self.centroids_green[0], self.centroids_green[1], 'go')
@@ -149,7 +146,7 @@ class ImageProcessor(Node):
 
     def plot_color(self, img):
         ax = self.fig.axes[0]
-        ax.cla()  # clear axis from last iteration
+        ax.cla()  
         ax.title.set_text("Color image")
         self.plot_centroids(ax)
         img.disp(fig=self.fig, ax=ax, fps=30)
@@ -174,11 +171,11 @@ class ImageProcessor(Node):
         self.plot_centroids(ax)
         mask_red.disp(fig=self.fig, ax=ax, fps=30)
 
-    # ------------------------------------------------------------------
+    # ==========================================
     # Callbacks
-    # ------------------------------------------------------------------
+    # ==========================================
+
     def sub_color_callback(self, msg):
-        # Convert ROS Image message to OpenCV image
         current_frame = self.br.imgmsg_to_cv2(msg)
         img = mvt.Image(current_frame)
 

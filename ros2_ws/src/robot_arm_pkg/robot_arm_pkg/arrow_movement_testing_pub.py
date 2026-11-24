@@ -14,7 +14,6 @@ class ArrowMovementTestingPub(Node):
         speed budou uhly za sekundu
     """
     def __init__(self):
-        # set window title to check for active window
         self.window_title = "ROS2_MOVEMENT_CONTROL"
         sys.stdout.write(f"\x1b]2;{self.window_title}\x07")
         sys.stdout.flush()
@@ -24,7 +23,7 @@ class ArrowMovementTestingPub(Node):
 
         self.active_motor_id = 1
 
-        # vypnuti echa v terminalu
+        # disable echo in terminal
         self.fd = sys.stdin.fileno()
         self.old_settings = termios.tcgetattr(self.fd)
         self.disable_echo()
@@ -79,7 +78,7 @@ def main():
     node = ArrowMovementTestingPub()
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt: # pro cistejsi ukonceni
+    except KeyboardInterrupt: 
         pass
     finally:
         node.listener.stop()

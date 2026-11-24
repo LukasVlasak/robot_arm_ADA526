@@ -1,8 +1,8 @@
 # Goal
 geometry_msgs/Point[] points
 MotorSpeeds[] speeds  # jedna MotorSpeeds (pole rychlosti na motor) na kazdy bod
-bool is_ball_action  # true = ball (predpocita vse, rychle), false = precision (po kazdem bodu ustaleni)
-int32 settle_point_index  # precision: index bodu s delsim ustalenim; -1 = zadny
+bool is_ball_action  # true = ball challenge, false = precision challenge
+int32 settle_point_index  # precision: index of point with longer stabilization time; -1 = none
 ---
 # Result
 bool success

@@ -15,21 +15,18 @@ class OperatorNode(Node):
     def __init__(self):
         super().__init__('operator_node')
 
-        # Publisher
         self.motor_publisher = self.create_publisher(
             MotorCommand,
             '/motor_controller/command',
             10
         )
 
-        # Ball Action Client
         self.ball_client = ActionClient(
             self,
             Ball,
             'ball'
         )
 
-        # Precision Action Client
         self.precision_client = ActionClient(
             self,
             Precision,
@@ -38,17 +35,12 @@ class OperatorNode(Node):
 
         self.get_logger().info('Operator node initialized')
 
-        # CLI input thread
         self.input_thread = threading.Thread(
             target=self.command_loop,
             daemon=True
         )
 
         self.input_thread.start()
-
-    # ==========================================
-    # CLI
-    # ==========================================
 
     def command_loop(self):
 

@@ -16,47 +16,19 @@ from robot_interfaces.msg import MotorSpeeds
 from geometry_msgs.msg import Point, PointStamped
 from std_msgs.msg import Empty
 
-
-# ==========================================
-# CAPTURE (cerstve pozice micku z kamery pred kazdou akci)
-# ==========================================
-
-# jak dlouho cekat, nez transformer posle ustalene pozice OBOU micku [s]
 CAPTURE_TIMEOUT = 15.0
-
-# perioda kontroly, jestli uz cerstve pozice dorazily [s]
 CAPTURE_POLL = 0.1
-
-
-# ==========================================
-# TRAJECTORY TUNING (menit pri testovani)
-# ==========================================
-
-# oba micky se schodi JEDNIM primym svihem po primce prvni -> druhy micek.
-# odpalova pozice je ZEZADU za prvnim mickem (z opacne strany nez druhy micek):
-#   1) VYSOKO nad odpalovou pozici    -> klidny najezd, mimo micky
-#   2) kolmo DOLU na vysku svihu       -> SETTLE (nechat rameno ustalit)
-#   3) primo na PRVNI micek            (rychle)
-#   4) primo na DRUHY micek            (rychle)
-#   5) HOME
-
-# jak VYSOKO nad vyskou svihu je pripravny bod nad odpalovou pozici [m]
 APPROACH_HEIGHT = 0.15
-
-# jak daleko za prvnim mickem (proti smeru svihu) je odpalova pozice [m]
-# dost na to, aby rameno pri sjezdu dolu prvni micek jeste netrklo, ale uz na primce
 BACKUP = 0.05
 
 
-# rychlosti pro useky - jedna hodnota na motor (poradi dle ACTIVE_MOTORS)
-# 42-45 = pomalu, 46-52 = hodne rychle (viz dxl_motors.setMotorsSpeed)
-SPEED_APPROACH = [40.0, 40.0, 40.0, 40.0, 40.0]  # klidny najezd na pripravne body
-SPEED_STRIKE = [162.0, 350.0, 220.0, 132.0, 132.0]    # BOOM - rychly primy svih pres oba micky
-SPEED_HOME = [46.0, 46.0, 46.0, 46.0, 46.0]      # navrat do home
+# speeds for parts of trajectory - one value for one motor 
+# 42-45 = slow, 46-52 = really fast (see dxl_motors.setMotorsSpeed)
+SPEED_APPROACH = [40.0, 40.0, 40.0, 40.0, 40.0]  
+SPEED_STRIKE = [162.0, 350.0, 220.0, 132.0, 132.0]    
+SPEED_HOME = [46.0, 46.0, 46.0, 46.0, 46.0]    
 
-# sentinel pro home pozici - controller si pohlida, ze souradnice == -1 a jede do HOME
 HOME_SENTINEL = -1.0
-
 
 class BallNode(Node):
 
@@ -66,12 +38,11 @@ class BallNode(Node):
         self.green_point = None
         self.red_point = None
 
-        # Reentrant group -> subscribery (green/red) mohou bezet SOUBEZNE s akci,
-        # ktera blokujicne ceka na cerstve pozice (viz __capture_fresh_points).
-        # Nutne spustit uzel na MultiThreadedExecutor (viz main).
+        # Reentrant group -> subscribers (green/red) can run CONCURRENTLY with an action
+        # that is waiting (blocking) for fresh positions (see __capture_fresh_points).
+        # The node must be run using a MultiThreadedExecutor (see main).
         self.cb_group = ReentrantCallbackGroup()
 
-        # Subscribers
         self.sub_green = self.create_subscription(
             PointStamped,
             '/goal_green_base',
@@ -88,15 +59,14 @@ class BallNode(Node):
             callback_group=self.cb_group
         )
 
-        # Capture request - rekne transformeru, at zahodi stare vzorky
-        # a posle cerstve ustalene pozice micku (viz __capture_fresh_points)
+        # Capture request - tells transformer to forget old points
+        # and sends recent position of balls (viz __capture_fresh_points)
         self.pub_capture = self.create_publisher(
             Empty,
             '/ball_capture',
             10
         )
 
-        # Action Server
         self._action_server = ActionServer(
             self,
             Ball,
@@ -109,16 +79,15 @@ class BallNode(Node):
 
         self.get_logger().info('Action server started')
 
-        # Motor Action Client
         self.motor_client = ActionClient(
             self,
             Motor,
             'motor'
         )
 
-    # --------------------------------------------------
-    # TRAJECTORY
-    # --------------------------------------------------
+    # ==========================================
+    # Helpers
+    # ==========================================
 
     def __make_point(self, x, y, z):
         p = Point()
@@ -128,20 +97,10 @@ class BallNode(Node):
         return p
 
     def generate_trajectory(self, first_point, second_point):
-        """
-        Vrati (points, speeds, settle_point_index) pro schozeni obou micku
-        a navrat do home.
-
-        Odpalova pozice je ZA prvnim mickem (proti smeru prvni -> druhy micek),
-        takze sjezd dolu prvni micek netrkne. Nejdriv se najede vysoko nad
-        odpalovou pozici, pak kolmo dolu na vysku svihu, tam SETTLE, a pak
-        rychle primo na prvni a hned na druhy micek.
-        """
 
         f = np.array([first_point.x, first_point.y, first_point.z], dtype=float)
         s = np.array([second_point.x, second_point.y, second_point.z], dtype=float)
 
-        # vodorovny smer prvni -> druhy micek; svih je rovnobezny s deskou
         d = s - f
         d[2] = 0.0
         dist = np.linalg.norm(d)
@@ -149,54 +108,43 @@ class BallNode(Node):
             raise ValueError("Micky jsou na sobe - nelze urcit smer svihu")
         d = d / dist
 
-        # vyska svihu - stred prvniho micku +- offset; cely svih je v teto vysce
         strike_z = f[2]
 
-        # odpalova pozice za prvnim mickem (na primce), x,y spolecne pro bod 0 i 1
         prestrike_xy = f - BACKUP * d
         after_first_xy = f + 0.01 * d
 
-        # 0) vysoko nad odpalovou pozici
         p_high = prestrike_xy.copy()
         p_high[2] = strike_z + APPROACH_HEIGHT
 
-
-        # 1) kolmo dolu na vysku svihu (tady SETTLE)
         p_down = prestrike_xy.copy()
         p_down[2] = strike_z
 
         p_after_first = after_first_xy.copy()
         p_after_first[2] = strike_z
 
-        # 2) primo prvni micek, 3) primo druhy micek - oba ve vysce svihu
-        p_first = np.array([f[0], f[1], strike_z])
         p_second = np.array([s[0], s[1], s[2]])
 
         points = [
-            self.__make_point(*p_high),    # 0: klidny najezd vysoko nad odpalovou pozici
-            self.__make_point(*p_down),    # 1: kolmo dolu na vysku svihu (tady SETTLE)
+            self.__make_point(*p_high),    
+            self.__make_point(*p_down),    
             self.__make_point(*p_after_first),
-            self.__make_point(*p_second),  # 3: primo druhy micek (rychle)
-            self.__make_point(HOME_SENTINEL, HOME_SENTINEL, HOME_SENTINEL),  # 4: home
+            self.__make_point(*p_second),  
+            self.__make_point(HOME_SENTINEL, HOME_SENTINEL, HOME_SENTINEL),  
         ]
 
         speeds = [
-            SPEED_APPROACH,  # 0 najezd vysoko
-            SPEED_APPROACH,  # 1 sjezd dolu
-            SPEED_STRIKE,    # 2 prvni micek
-            SPEED_STRIKE,    # 3 druhy micek
-            SPEED_HOME,      # 4 home
+            SPEED_APPROACH,  
+            SPEED_APPROACH,  
+            SPEED_STRIKE,    
+            SPEED_STRIKE,    
+            SPEED_HOME,      
         ]
 
-        # po sjezdu na vysku svihu (index 1) necha controller rameno ustalit,
-        # nez vyrazi na micky
+        # Index of point where the arm have to settle before strike
         settle_point_index = 1
 
         return points, speeds, settle_point_index
 
-    # --------------------------------------------------
-    # MOTOR ACTION CLIENT
-    # --------------------------------------------------
 
     async def move_robot(self, points, speeds, settle_point_index=-1):
 
@@ -207,8 +155,8 @@ class BallNode(Node):
         goal = Motor.Goal()
         goal.points = points
         goal.speeds = [MotorSpeeds(speeds=s) for s in speeds]
-        goal.is_ball_action = True  # ball -> predpocita vsechnu kinematiku dopredu
-        goal.settle_point_index = settle_point_index  # odpalovy bod s ustalenim pred svihem
+        goal.is_ball_action = True  
+        goal.settle_point_index = settle_point_index 
 
         send_goal_future = self.motor_client.send_goal_async(goal)
 
@@ -230,19 +178,15 @@ class BallNode(Node):
         self.get_logger().error('Movement failed')
         return False
 
-    # --------------------------------------------------
-    # SUBSCRIBERS
-    # --------------------------------------------------
+    # ==========================================
+    # Callbacks
+    # ==========================================
 
     def green_callback(self, msg):
         self.green_point = msg.point
 
     def red_callback(self, msg):
         self.red_point = msg.point
-
-    # --------------------------------------------------
-    # ACTION CALLBACKS
-    # --------------------------------------------------
 
     def goal_callback(self, goal_request):
         return GoalResponse.ACCEPT
@@ -251,25 +195,12 @@ class BallNode(Node):
         self.get_logger().info('Cancel request received')
         return CancelResponse.ACCEPT
 
-    # --------------------------------------------------
-    # CAPTURE CERSTVYCH POZIC
-    # --------------------------------------------------
-
     def __capture_fresh_points(self):
-        """
-        Zahodi stare pozice, pozada transformer o cerstve vzorky a pocka,
-        nez dorazi ustalene pozice OBOU micku. Diky tomu se nikdy nepouzije
-        stara pozice z predchozi akce (po presunu micku). Vraci True pri uspechu,
-        False pri timeoutu.
-
-        Ceka blokujicne (time.sleep) - green/red callbacky bezi soubezne diky
-        ReentrantCallbackGroup + MultiThreadedExecutor.
-        """
         self.green_point = None
         self.red_point = None
 
         self.pub_capture.publish(Empty())
-        self.get_logger().info('Capture request poslan, cekam na ustalene pozice...')
+        self.get_logger().info('Capture request send, waiting for setteled positions...')
 
         waited = 0.0
         while self.green_point is None or self.red_point is None:
@@ -280,10 +211,7 @@ class BallNode(Node):
 
         return True
 
-    # --------------------------------------------------
-    # EXECUTE BALL ACTION
-    # --------------------------------------------------
-
+ 
     async def execute_callback(self, goal_handle):
 
         self.get_logger().info('Executing ball action')
@@ -301,7 +229,6 @@ class BallNode(Node):
 
             return result
 
-        # cerstve ustalene pozice obou micku z kamery (zahodi stare hodnoty)
         if not self.__capture_fresh_points():
 
             self.get_logger().error('Timeout - neprisly ustalene pozice micku')
@@ -314,7 +241,6 @@ class BallNode(Node):
 
             return result
 
-        # Select first and second ball
         if first_ball == "green":
             first_point = self.green_point
             second_point = self.red_point
@@ -368,7 +294,6 @@ class BallNode(Node):
 
             return result
 
-        # Action completed successfully
         goal_handle.succeed()
 
         result = Ball.Result()
@@ -384,8 +309,6 @@ def main(args=None):
 
     node = BallNode()
 
-    # MultiThreadedExecutor -> green/red callbacky bezi soubezne, zatimco akce
-    # blokujicne ceka na cerstve pozice (viz __capture_fresh_points)
     executor = MultiThreadedExecutor(num_threads=4)
     executor.add_node(node)
 
